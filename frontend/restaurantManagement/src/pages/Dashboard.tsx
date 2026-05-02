@@ -1,28 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Minus, X, ShoppingBag, Loader2, CreditCard, BookMarked, PlusCircle, Trash2 } from 'lucide-react';
 import { tableApi } from '../api/tableApi';
+import { menuApi } from '../api/menuApi';
 import type { RestaurantTable, TableStatus } from '../types/table';
+import type { MenuItem } from '../api/menuApi';
 
-// ─── Kiểu món ăn & giỏ hàng ────────────────────────────────────────────────
-interface MenuDish {
-  id: number;
-  name: string;
-  price: number;
-}
-
-interface CartItem extends MenuDish {
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface CartItem extends MenuItem {
   quantity: number;
 }
 
-// ─── Menu giả lập (thay bằng menuApi sau) ───────────────────────────────────
-const MENU_DISHES: MenuDish[] = [
-  { id: 101, name: 'Phở Đặc Biệt',   price: 65000 },
-  { id: 102, name: 'Bún Chả Hà Nội', price: 55000 },
-  { id: 103, name: 'Cà Phê Muối',    price: 35000 },
-  { id: 104, name: 'Trà Đào Cam Sả', price: 40000 },
-];
-
-// ─── Màu theo trạng thái ────────────────────────────────────────────────────
+// ─── Màu theo trạng thái ─────────────────────────────────────────────────────
 const STATUS_STYLE: Record<TableStatus, { card: string; badge: string; label: string }> = {
   AVAILABLE:   { card: 'bg-[#E9F5F8] border-[#D1E9F0]', badge: 'bg-green-100 text-green-700',   label: 'Trống'     },
   OCCUPIED:    { card: 'bg-[#FDF5E6] border-[#F3E8D6]', badge: 'bg-red-100 text-red-700',       label: 'Có khách'  },
@@ -32,34 +20,33 @@ const STATUS_STYLE: Record<TableStatus, { card: string; badge: string; label: st
 
 // ────────────────────────────────────────────────────────────────────────────
 const Dashboard: React.FC = () => {
-  
+
   const [tables, setTables]               = useState<RestaurantTable[]>([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
 
-  // Lưu order đã confirm theo tableId — persist khi đóng/mở lại panel
-  const [tableOrders, setTableOrders]     = useState<Record<number, CartItem[]>>({});
+  // ── Menu thật từ API ──────────────────────────────────────────────────────
+  const [menuDishes, setMenuDishes]       = useState<MenuItem[]>([]);
+  const [menuLoading, setMenuLoading]     = useState(false);
+  const [menuError, setMenuError]         = useState<string | null>(null);
 
-  // Món đang thêm mới, chưa confirm
+  const [tableOrders, setTableOrders]     = useState<Record<number, CartItem[]>>({});
   const [pendingCart, setPendingCart]     = useState<CartItem[]>([]);
 
   const [confirming, setConfirming]       = useState(false);
   const [paying, setPaying]               = useState(false);
-  const [reserving, setReserving]           = useState(false);
-  const [confirmDelete, setConfirmDelete]   = useState(false);
-  const [deleting, setDeleting]             = useState(false);
+  const [reserving, setReserving]         = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting]           = useState(false);
 
-  // ── State modal thêm bàn ─────────────────────────────────────────────────
-  const [showAddModal, setShowAddModal]     = useState(false);
-  const [addForm, setAddForm]               = useState({ tableNumber: '', capacity: '', location: '' });
-  const [addError, setAddError]             = useState<string | null>(null);
-  const [adding, setAdding]                 = useState(false);
+  const [showAddModal, setShowAddModal]   = useState(false);
+  const [addForm, setAddForm]             = useState({ tableNumber: '', capacity: '', location: '' });
+  const [addError, setAddError]           = useState<string | null>(null);
+  const [adding, setAdding]               = useState(false);
 
-  // ── Fetch danh sách bàn ──────────────────────────────────────────────────
-  useEffect(() => {
-    fetchTables();
-  }, []);
+  // ── Fetch bàn ────────────────────────────────────────────────────────────
+  useEffect(() => { fetchTables(); }, []);
 
   const fetchTables = async () => {
     try {
@@ -68,14 +55,25 @@ const Dashboard: React.FC = () => {
       const data = await tableApi.getAll();
       setTables(data);
     } catch (err) {
-      console.error('Fetch error:', err);
       setError('Không thể tải danh sách bàn. Kiểm tra backend đang chạy chưa?');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Chọn bàn — chỉ mở panel, KHÔNG đổi status
+  // ── Fetch menu khi mở panel ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedTable) return;
+    if (menuDishes.length > 0) return; // đã load rồi thì thôi
+    setMenuLoading(true);
+    setMenuError(null);
+    menuApi.getAll()
+      .then(setMenuDishes)
+      .catch(() => setMenuError('Không tải được thực đơn'))
+      .finally(() => setMenuLoading(false));
+  }, [selectedTable]);
+
+  // ── Chọn bàn ─────────────────────────────────────────────────────────────
   const handleSelectTable = (table: RestaurantTable) => {
     if (table.status === 'MAINTENANCE') return;
     setSelectedTable(table);
@@ -87,8 +85,8 @@ const Dashboard: React.FC = () => {
     setPendingCart([]);
   };
 
-  // ── Pending cart 
-  const addToPending = (dish: MenuDish) => {
+  // ── Pending cart ──────────────────────────────────────────────────────────
+  const addToPending = (dish: MenuItem) => {
     setPendingCart(prev => {
       const existing = prev.find(i => i.id === dish.id);
       if (existing) return prev.map(i => i.id === dish.id ? { ...i, quantity: i.quantity + 1 } : i);
@@ -103,10 +101,8 @@ const Dashboard: React.FC = () => {
     );
   };
 
-  // Order đã confirmed của bàn đang chọn
   const confirmedOrder = selectedTable ? (tableOrders[selectedTable.id] ?? []) : [];
 
-  // Tổng tiền = confirmed + pending
   const allItems = [...confirmedOrder];
   for (const p of pendingCart) {
     const idx = allItems.findIndex(i => i.id === p.id);
@@ -115,20 +111,16 @@ const Dashboard: React.FC = () => {
   }
   const totalPrice = allItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-  // ── Xác nhận đặt món → gộp pending vào order của bàn ────────────────────
+  // ── Xác nhận đặt món ──────────────────────────────────────────────────────
   const handleConfirm = async () => {
     if (pendingCart.length === 0 || !selectedTable) return;
     setConfirming(true);
     try {
-      await new Promise(res => setTimeout(res, 800)); // giả lập orderApi
-
-      // Đổi status → OCCUPIED khi xác nhận đặt món lần đầu
       if (selectedTable.status !== 'OCCUPIED') {
         const updatedTable = await tableApi.setStatus(selectedTable.id, 'OCCUPIED');
         setTables(prev => prev.map(t => t.id === updatedTable.id ? updatedTable : t));
         setSelectedTable(updatedTable);
       }
-
       setTableOrders(prev => {
         const current = prev[selectedTable.id] ?? [];
         const updated = [...current];
@@ -139,7 +131,6 @@ const Dashboard: React.FC = () => {
         }
         return { ...prev, [selectedTable.id]: updated };
       });
-
       setPendingCart([]);
     } catch {
       alert('Lỗi khi đặt món, thử lại!');
@@ -148,22 +139,18 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // ── Thanh toán → đổi bàn về AVAILABLE, xóa order ─────────────────────────
+  // ── Thanh toán ────────────────────────────────────────────────────────────
   const handlePayment = async () => {
     if (!selectedTable) return;
     setPaying(true);
     try {
-      await new Promise(res => setTimeout(res, 800)); // giả lập paymentApi
-
       const updated = await tableApi.setStatus(selectedTable.id, 'AVAILABLE');
       setTables(prev => prev.map(t => t.id === updated.id ? updated : t));
-
       setTableOrders(prev => {
         const next = { ...prev };
         delete next[selectedTable.id];
         return next;
       });
-
       setSelectedTable(null);
       setPendingCart([]);
     } catch {
@@ -172,7 +159,6 @@ const Dashboard: React.FC = () => {
       setPaying(false);
     }
   };
-
 
   // ── Xoá bàn ──────────────────────────────────────────────────────────────
   const handleDeleteTable = async () => {
@@ -196,7 +182,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // ── Thêm bàn mới ────────────────────────────────────────────────────────
+  // ── Thêm bàn ─────────────────────────────────────────────────────────────
   const handleAddTable = async () => {
     const tableNum = parseInt(addForm.tableNumber);
     const cap      = parseInt(addForm.capacity);
@@ -224,7 +210,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // ── Đặt trước → đổi status sang RESERVED ────────────────────────────────
+  // ── Đặt trước ─────────────────────────────────────────────────────────────
   const handleReserve = async () => {
     if (!selectedTable) return;
     setReserving(true);
@@ -255,7 +241,6 @@ const Dashboard: React.FC = () => {
         </div>
         <p className="text-gray-400 mb-8">Sơ đồ bàn ăn của cửa hàng</p>
 
-        {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center h-48 text-gray-400">
             <Loader2 size={32} className="animate-spin mr-3" />
@@ -263,7 +248,6 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 rounded-2xl p-6 mb-6 flex justify-between items-center">
             <span>{error}</span>
@@ -271,7 +255,6 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Grid bàn */}
         {!loading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tables.map((table) => {
@@ -309,7 +292,6 @@ const Dashboard: React.FC = () => {
                   {table.location && (
                     <p className="mt-1 text-xs text-gray-400">{table.location}</p>
                   )}
-                  {/* Nút xoá — hiện khi hover, chỉ cho bàn không có khách */}
                   {table.status !== 'OCCUPIED' && (
                     <button
                       onClick={e => {
@@ -336,7 +318,6 @@ const Dashboard: React.FC = () => {
 
         {selectedTable && (
           <div className="flex flex-col h-full p-6">
-            {/* Header */}
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-2xl font-semibold text-gray-800 uppercase">
@@ -350,14 +331,10 @@ const Dashboard: React.FC = () => {
                 <button
                   onClick={() => setConfirmDelete(true)}
                   className="p-2 bg-gray-100 rounded-full hover:bg-red-50 hover:text-red-500 transition"
-                  title="Xoá bàn"
                 >
                   <Trash2 size={18} />
                 </button>
-                <button
-                  onClick={handleClose}
-                  className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
-                >
+                <button onClick={handleClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
                   <X size={20} />
                 </button>
               </div>
@@ -365,7 +342,7 @@ const Dashboard: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto space-y-6">
 
-              {/* ── Đơn đã xác nhận ── */}
+              {/* Đơn đã xác nhận */}
               {confirmedOrder.length > 0 && (
                 <div>
                   <div className="flex items-center space-x-2 text-[#8C6F56] mb-3">
@@ -374,10 +351,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     {confirmedOrder.map(item => (
-                      <div
-                        key={item.id}
-                        className="flex justify-between items-center bg-[#FDF5E6] px-4 py-3 rounded-2xl border border-[#F3E8D6]"
-                      >
+                      <div key={item.id} className="flex justify-between items-center bg-[#FDF5E6] px-4 py-3 rounded-2xl border border-[#F3E8D6]">
                         <div>
                           <p className="font-medium text-gray-800 text-sm">{item.name}</p>
                           <p className="text-[#8C6F56] text-xs">{(item.price * item.quantity).toLocaleString()}đ</p>
@@ -389,7 +363,7 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* ── Thêm món mới ── */}
+              {/* Thêm món mới */}
               <div>
                 <div className="flex items-center space-x-2 text-gray-400 mb-3">
                   <Plus size={16} />
@@ -403,10 +377,7 @@ const Dashboard: React.FC = () => {
                 ) : (
                   <div className="space-y-2">
                     {pendingCart.map(item => (
-                      <div
-                        key={item.id}
-                        className="flex justify-between items-center bg-gray-50 px-4 py-3 rounded-2xl border border-gray-100"
-                      >
+                      <div key={item.id} className="flex justify-between items-center bg-gray-50 px-4 py-3 rounded-2xl border border-gray-100">
                         <div>
                           <p className="font-medium text-gray-800 text-sm">{item.name}</p>
                           <p className="text-gray-400 text-xs">{(item.price * item.quantity).toLocaleString()}đ</p>
@@ -425,37 +396,64 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Menu */}
+                {/* Menu từ API */}
                 <div className="mt-4">
                   <p className="text-xs text-gray-300 uppercase mb-3 tracking-tighter">Thực đơn nhà hàng</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {MENU_DISHES.map(dish => (
+
+                  {menuLoading && (
+                    <div className="flex items-center justify-center py-6 text-gray-300 gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-sm">Đang tải thực đơn...</span>
+                    </div>
+                  )}
+
+                  {menuError && (
+                    <div className="text-red-400 text-xs text-center py-4 bg-red-50 rounded-2xl">
+                      {menuError}
                       <button
-                        key={dish.id}
-                        onClick={() => addToPending(dish)}
-                        className="flex justify-between items-center p-4 rounded-2xl border border-gray-100 hover:border-[#8C6F56] hover:bg-[#F3E8D6]/10 transition group text-left"
+                        onClick={() => {
+                          setMenuError(null);
+                          setMenuLoading(true);
+                          menuApi.getAll()
+                            .then(setMenuDishes)
+                            .catch(() => setMenuError('Không tải được thực đơn'))
+                            .finally(() => setMenuLoading(false));
+                        }}
+                        className="block mx-auto mt-1 underline"
                       >
-                        <div>
-                          <span className="text-gray-700 text-sm">{dish.name}</span>
-                          <span className="ml-3 text-xs text-gray-400">{dish.price.toLocaleString()}đ</span>
-                        </div>
-                        <Plus size={16} className="text-gray-300 group-hover:text-[#8C6F56]" />
+                        Thử lại
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+
+                  {!menuLoading && !menuError && (
+                    <div className="grid grid-cols-1 gap-2">
+                      {menuDishes.map(dish => (
+                        <button
+                          key={dish.id}
+                          onClick={() => addToPending(dish)}
+                          className="flex justify-between items-center p-4 rounded-2xl border border-gray-100 hover:border-[#8C6F56] hover:bg-[#F3E8D6]/10 transition group text-left"
+                        >
+                          <div>
+                            <span className="text-gray-700 text-sm">{dish.name}</span>
+                            <span className="ml-3 text-xs text-gray-400">{dish.price.toLocaleString()}đ</span>
+                          </div>
+                          <Plus size={16} className="text-gray-300 group-hover:text-[#8C6F56]" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* ── Footer ── */}
+            {/* Footer */}
             <div className="pt-6 border-t border-gray-100 space-y-3 mt-4">
               <div className="flex justify-between items-center px-1">
                 <span className="text-gray-400 text-sm">Tổng cộng:</span>
                 <span className="text-2xl font-semibold text-gray-800">{totalPrice.toLocaleString()}đ</span>
               </div>
 
-
-              {/* Đặt trước — chỉ hiện khi bàn chưa có khách */}
               {selectedTable.status !== 'OCCUPIED' && confirmedOrder.length === 0 && (
                 <button
                   onClick={handleReserve}
@@ -466,7 +464,7 @@ const Dashboard: React.FC = () => {
                   {reserving ? 'Đang xử lý...' : selectedTable.status === 'RESERVED' ? 'Đã đặt trước' : 'Đặt trước'}
                 </button>
               )}
-              {/* Xác nhận đặt món — chỉ active khi có món mới chưa confirm */}
+
               <button
                 onClick={handleConfirm}
                 disabled={pendingCart.length === 0 || confirming}
@@ -476,7 +474,6 @@ const Dashboard: React.FC = () => {
                 {confirming ? 'Đang xử lý...' : 'Xác nhận đặt món'}
               </button>
 
-              {/* Thanh toán — chỉ hiện khi bàn đã có order đã confirm */}
               {confirmedOrder.length > 0 && (
                 <button
                   onClick={handlePayment}
@@ -500,7 +497,9 @@ const Dashboard: React.FC = () => {
             <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Trash2 size={24} className="text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">Xoá bàn {String(selectedTable.tableNumber).padStart(2, '0')}?</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+              Xoá bàn {String(selectedTable.tableNumber).padStart(2, '0')}?
+            </h3>
             <p className="text-gray-400 text-sm mb-6">
               {selectedTable.status === 'OCCUPIED'
                 ? 'Bàn đang có khách, bạn chắc chắn muốn xoá?'
@@ -529,10 +528,7 @@ const Dashboard: React.FC = () => {
       {/* ── Modal thêm bàn ── */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-
-          {/* Card */}
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-8">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold text-gray-800">Thêm bàn mới</h3>
@@ -540,52 +536,38 @@ const Dashboard: React.FC = () => {
                 <X size={18} />
               </button>
             </div>
-
             <div className="space-y-4">
-              {/* Số bàn */}
               <div>
                 <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Số bàn</label>
                 <input
-                  type="number"
-                  min={1}
-                  placeholder="VD: 5"
+                  type="number" min={1} placeholder="VD: 5"
                   value={addForm.tableNumber}
                   onChange={e => setAddForm(f => ({ ...f, tableNumber: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition"
                 />
               </div>
-
-              {/* Sức chứa */}
               <div>
                 <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Sức chứa (người)</label>
                 <input
-                  type="number"
-                  min={1}
-                  placeholder="VD: 4"
+                  type="number" min={1} placeholder="VD: 4"
                   value={addForm.capacity}
                   onChange={e => setAddForm(f => ({ ...f, capacity: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition"
                 />
               </div>
-
-              {/* Vị trí */}
               <div>
-                <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Vị trí <span className="normal-case text-gray-300">(tuỳ chọn)</span></label>
+                <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+                  Vị trí <span className="normal-case text-gray-300">(tuỳ chọn)</span>
+                </label>
                 <input
-                  type="text"
-                  placeholder="VD: Tầng 1, Ngoài trời..."
+                  type="text" placeholder="VD: Tầng 1, Ngoài trời..."
                   value={addForm.location}
                   onChange={e => setAddForm(f => ({ ...f, location: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition"
                 />
               </div>
-
-              {/* Error */}
-              {addError && (
-                <p className="text-red-500 text-sm bg-red-50 px-4 py-2 rounded-xl">{addError}</p>
-              )}
+              {addError && <p className="text-red-500 text-sm bg-red-50 px-4 py-2 rounded-xl">{addError}</p>}
             </div>
-
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => setShowAddModal(false)}

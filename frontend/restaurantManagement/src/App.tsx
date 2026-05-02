@@ -5,6 +5,7 @@ import ProtectedRoute from './layout/components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import MainLayout from './layout/MainLayout';
 import StaffPage from './pages/StaffPage';
+import AccountManagementPage from './pages/AccountManagementPage';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
     <Route path="/tables" element={<Dashboard />} />
     <Route path="/menu" element={<MenuPage />} />
     <Route path="/staff" element={<StaffPage />} />
+    <Route path="/accounts" element={<AccountManagementPage/>}/>
     <Route path="/reports" element={<h1>Coming Soon...</h1>} />
   </Route>
 </Routes>

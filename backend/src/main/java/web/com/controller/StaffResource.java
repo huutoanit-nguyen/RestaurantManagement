@@ -12,6 +12,8 @@ import web.com.model.Staff;
 
 import java.util.List;
 
+import io.quarkus.elytron.security.common.BcryptUtil;
+
 @Path("/api/staff")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -24,17 +26,16 @@ public class StaffResource {
     @GET
     @PermitAll
     public List<Staff> getAll(
-        @QueryParam("role")   String role,
-        @QueryParam("shift")  String shift,
-        @QueryParam("search") String search
-    ) {
+            @QueryParam("role") String role,
+            @QueryParam("shift") String shift,
+            @QueryParam("search") String search) {
         if (role != null)
             return Staff.list("role", role);
         if (shift != null)
             return Staff.list("shift", shift);
         if (search != null)
             return Staff.find("lower(name) like ?1",
-                "%" + search.toLowerCase() + "%").list();
+                    "%" + search.toLowerCase() + "%").list();
         return Staff.listAll();
     }
 
@@ -61,8 +62,8 @@ public class StaffResource {
     @Transactional
     public Staff update(@PathParam("id") Long id, @Valid Staff body) {
         Staff entity = findOrThrow(id);
-        entity.fullName  = body.fullName;
-        entity.role  = body.role;
+        entity.fullName = body.fullName;
+        entity.role = body.role;
         entity.shift = body.shift;
         return entity;
     }
@@ -74,22 +75,50 @@ public class StaffResource {
     @RolesAllowed("Quản lý")
     public Response delete(@PathParam("id") Long id) {
         boolean deleted = Staff.deleteById(id);
-        if (!deleted) throw notFound(id);
+        if (!deleted)
+            throw notFound(id);
         return Response.noContent().build(); // 204
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     private Staff findOrThrow(Long id) {
         Staff s = Staff.findById(id);
-        if (s == null) throw notFound(id);
+        if (s == null)
+            throw notFound(id);
         return s;
     }
 
     private WebApplicationException notFound(Long id) {
         return new WebApplicationException(
-            Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ErrorResponse("Không tìm thấy nhân viên với id = " + id))
-                    .build()
-        );
+                Response.status(Response.Status.NOT_FOUND)
+                        .entity(new ErrorResponse("Không tìm thấy nhân viên với id = " + id))
+                        .build());
+    }
+
+    // PUT /api/staff/{id}/account — tạo hoặc đổi username/password
+    @PUT
+    @Path("/{id}/account")
+    @Transactional
+    @RolesAllowed("Quản lý")
+    public Staff setAccount(@PathParam("id") Long id, AccountRequest req) {
+        Staff entity = findOrThrow(id);
+        entity.username = req.username();
+        entity.password = BcryptUtil.bcryptHash(req.password());
+        return entity;
+    }
+
+    // DELETE /api/staff/{id}/account — xoá tài khoản
+    @DELETE
+    @Path("/{id}/account")
+    @Transactional
+    @RolesAllowed("Quản lý")
+    public Response removeAccount(@PathParam("id") Long id) {
+        Staff entity = findOrThrow(id);
+        entity.username = null;
+        entity.password = null;
+        return Response.noContent().build();
+    }
+
+    public record AccountRequest(String username, String password) {
     }
 }

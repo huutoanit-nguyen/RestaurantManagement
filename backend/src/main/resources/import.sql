@@ -20,3 +20,4 @@ INSERT INTO MenuItem (category, name, price) VALUES ('Đồ uống', 'Cà Phê M
 INSERT INTO MenuItem (category, name, price) VALUES ('Đồ uống', 'Nước Ép Cam Tươi', 40000);
 
 UPDATE MenuItem_SEQ SET next_val = 11;
+

@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types
 interface LoginResponse {
   token: string;
   name: string;
   role: string;
 }
 
-// ─── API ──────────────────────────────────────────────────────────────────────
+// ─── API 
 async function login(username: string, password: string): Promise<LoginResponse> {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!username.trim()) { setError('Vui lòng nhập tên đăng nhập'); return; }
     if (!password)        { setError('Vui lòng nhập mật khẩu'); return; }

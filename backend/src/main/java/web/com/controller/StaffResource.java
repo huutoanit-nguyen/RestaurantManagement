@@ -95,15 +95,18 @@ public class StaffResource {
                         .build());
     }
 
-    // PUT /api/staff/{id}/account — tạo hoặc đổi username/password
+    // PUT /api/staff/{id}/account 
     @PUT
     @Path("/{id}/account")
     @Transactional
     @RolesAllowed("Quản lý")
     public Staff setAccount(@PathParam("id") Long id, AccountRequest req) {
-        Staff entity = findOrThrow(id);
+        Staff entity = Staff.findById(id);
+        if (entity == null)
+            throw new WebApplicationException(Response.Status.NOT_FOUND);
         entity.username = req.username();
-        entity.password = BcryptUtil.bcryptHash(req.password());
+        entity.setPassword(req.password);
+        entity.persistAndFlush();
         return entity;
     }
 

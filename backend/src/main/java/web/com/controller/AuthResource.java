@@ -15,8 +15,11 @@ import java.util.Set;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    public record LoginRequest(String username, String password) {}
-    public record LoginResponse(String token, String name, String role) {}
+    public record LoginRequest(String username, String password) {
+    }
+
+    public record LoginResponse(String token, String name, String role) {
+    }
 
     @POST
     @Path("/login")
@@ -25,16 +28,34 @@ public class AuthResource {
 
         if (staff == null || !BcryptUtil.matches(req.password(), staff.password)) {
             return Response.status(Response.Status.UNAUTHORIZED)
-                           .entity(new ErrorResponse("Sai tài khoản hoặc mật khẩu"))
-                           .build();
+                    .entity(new ErrorResponse("Sai tài khoản hoặc mật khẩu"))
+                    .build();
         }
 
         String token = Jwt.issuer("restaurant-app")
-                          .subject(staff.username)
-                          .groups(Set.of(staff.role))
-                          .expiresIn(86400) // 24h
-                          .sign();
+                .subject(staff.username)
+                .groups(Set.of(staff.role))
+                .expiresIn(86400) // 24h
+                .sign();
 
         return Response.ok(new LoginResponse(token, staff.fullName, staff.role)).build();
+    }
+
+    @GET
+    @Path("/test-login")
+    public String testLogin(@QueryParam("username") String username, @QueryParam("password") String password) {
+        Staff staff = Staff.find("username", username).firstResult();
+        if (staff == null)
+            return "Không tìm thấy user: " + username;
+        if (staff.password == null)
+            return "Password trong DB đang NULL";
+        boolean match = BcryptUtil.matches(password, staff.password);
+        return "match=" + match + " | hash=" + staff.password.substring(0, 10) + "...";
+    }
+
+    @GET
+    @Path("/hash")
+    public String hash(@QueryParam("password") String password) {
+        return BcryptUtil.bcryptHash(password, 12);
     }
 }

@@ -15,7 +15,7 @@ public class Staff extends PanacheEntity {
     // Sửa lại cho khớp hoàn toàn với SQL
     @NotBlank(message = "Tên không được để trống")
     @Column(name = "fullName", nullable = false, length = 255)
-    public String fullName; // Đổi từ name thành fullName cho đồng bộ
+    public String fullName; 
 
     @NotBlank(message = "Vai trò không được để trống")
     @Column(nullable = false, length = 100)
@@ -25,11 +25,11 @@ public class Staff extends PanacheEntity {
     @Column(nullable = false, length = 50)
     public String shift;
 
-    @Column(unique = true, length = 50) // Khớp với SQL VARCHAR(50)
+    @Column(unique = true, length = 50) 
     public String username;
 
     @Column(length = 255)
-    @JsonIgnore  
+    @JsonIgnore
     public String password;
 
     // Hàm này dùng khi tạo mới nhân viên từ API

@@ -17,19 +17,4 @@ CREATE TABLE staff (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO staff (id, fullName, role, shift, username, password) 
-VALUES (1, 'Nguyễn Văn A', 'Quản lý', 'Ca sáng', 'admin', '$2a$10$eokvvzdOnL.V6Y.6L3K2ueH/N8k.SndS7q.B1o4.q8S.SndS7q.B1');
-
-INSERT INTO staff (id, fullName, role, shift, username, password) 
-VALUES (2, 'Trần Thị B', 'Phục vụ', 'Ca sáng', 'staff1', '$2a$10$eokvvzdOnL.V6Y.6L3K2ueH/N8k.SndS7q.B1o4.q8S.SndS7q.B1');
-
-INSERT INTO staff (id, fullName, role, shift, username, password) 
-VALUES (3, 'Lê Văn C', 'Phục vụ', 'Ca chiều', 'staff2', '$2a$10$eokvvzdOnL.V6Y.6L3K2ueH/N8k.SndS7q.B1o4.q8S.SndS7q.B1');
-
-INSERT INTO staff (id, fullName, role, shift, username, password) 
-VALUES (4, 'Phạm Thị D', 'Thu ngân', 'Ca tối', 'cashier', '$2a$10$eokvvzdOnL.V6Y.6L3K2ueH/N8k.SndS7q.B1o4.q8S.SndS7q.B1');
-
-INSERT INTO staff (id, fullName, role, shift, username, password) 
-VALUES (5, 'Hoàng Văn E', 'Bếp', 'Ca sáng', 'chef', '$2a$10$eokvvzdOnL.V6Y.6L3K2ueH/N8k.SndS7q.B1o4.q8S.SndS7q.B1');
-
 UPDATE staff_SEQ SET next_val = 6;

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Minus, X, ShoppingBag, Loader2, CreditCard, BookMarked, PlusCircle, Trash2 } from 'lucide-react';
+import { Users, Plus, Minus, X, ShoppingBag, Loader2, CreditCard, BookMarked, PlusCircle, Trash2, FileText } from 'lucide-react';
 import { tableApi } from '../api/tableApi';
 import { menuApi } from '../api/menuApi';
 import type { RestaurantTable, TableStatus } from '../types/table';
 import type { MenuItem } from '../api/menuApi';
+import jsPDF from 'jspdf';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface CartItem extends MenuItem {
@@ -26,7 +27,6 @@ const Dashboard: React.FC = () => {
   const [error, setError]                 = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
 
-  // ── Menu thật từ API ──────────────────────────────────────────────────────
   const [menuDishes, setMenuDishes]       = useState<MenuItem[]>([]);
   const [menuLoading, setMenuLoading]     = useState(false);
   const [menuError, setMenuError]         = useState<string | null>(null);
@@ -54,7 +54,7 @@ const Dashboard: React.FC = () => {
       setError(null);
       const data = await tableApi.getAll();
       setTables(data);
-    } catch (err) {
+    } catch {
       setError('Không thể tải danh sách bàn. Kiểm tra backend đang chạy chưa?');
     } finally {
       setLoading(false);
@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
   // ── Fetch menu khi mở panel ───────────────────────────────────────────────
   useEffect(() => {
     if (!selectedTable) return;
-    if (menuDishes.length > 0) return; // đã load rồi thì thôi
+    if (menuDishes.length > 0) return;
     setMenuLoading(true);
     setMenuError(null);
     menuApi.getAll()
@@ -225,6 +225,133 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // ── Xuất hoá đơn PDF (client-side, không cần API) ────────────────────────
+  const handleExportInvoice = () => {
+    if (!selectedTable || confirmedOrder.length === 0) return;
+
+    const doc    = new jsPDF({ unit: 'mm', format: 'a5' });
+    const pageW  = doc.internal.pageSize.getWidth();
+    const margin = 12;
+    let y = 14;
+
+    // ── Header ──
+    doc.setFillColor(140, 111, 86); // màu nâu #8C6F56
+    doc.rect(0, 0, pageW, 28, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text('HOA DON THANH TOAN', pageW / 2, y + 2, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Restaurant Management Platform', pageW / 2, y + 9, { align: 'center' });
+    y = 34;
+
+    // ── Thông tin bàn & ngày ──
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(`BAN ${String(selectedTable.tableNumber).padStart(2, '0')}`, margin, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Suc chua: ${selectedTable.capacity} nguoi`, pageW - margin, y, { align: 'right' });
+    y += 5;
+
+    doc.setFontSize(8.5);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Ngay: ${new Date().toLocaleString('vi-VN')}`, margin, y);
+    if (selectedTable.location) {
+      doc.text(`Vi tri: ${selectedTable.location}`, pageW - margin, y, { align: 'right' });
+    }
+    y += 7;
+
+    // ── Đường kẻ ──
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageW - margin, y);
+    y += 5;
+
+    // ── Header bảng món ──
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Ten mon', margin, y);
+    doc.text('SL', pageW - 52, y, { align: 'right' });
+    doc.text('Don gia', pageW - 32, y, { align: 'right' });
+    doc.text('T.tien', pageW - margin, y, { align: 'right' });
+    y += 3;
+    doc.line(margin, y, pageW - margin, y);
+    y += 5;
+
+    // ── Danh sách món ──
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    confirmedOrder.forEach((item, idx) => {
+      // Xen kẽ nền nhẹ
+      if (idx % 2 === 0) {
+        doc.setFillColor(250, 247, 242);
+        doc.rect(margin - 1, y - 4, pageW - margin * 2 + 2, 7, 'F');
+      }
+
+      doc.setTextColor(50, 50, 50);
+      const nameLines = doc.splitTextToSize(item.name, 55);
+      doc.text(nameLines, margin, y);
+      doc.text(String(item.quantity), pageW - 52, y, { align: 'right' });
+      doc.text(item.price.toLocaleString('vi-VN'), pageW - 32, y, { align: 'right' });
+      doc.text((item.price * item.quantity).toLocaleString('vi-VN'), pageW - margin, y, { align: 'right' });
+      y += nameLines.length > 1 ? nameLines.length * 5 + 1 : 8;
+    });
+
+    y += 2;
+    doc.setDrawColor(140, 111, 86);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageW - margin, y);
+    y += 7;
+
+    // ── Tổng tiền ──
+    doc.setFillColor(243, 232, 214); // nền vàng nhạt
+    doc.roundedRect(margin - 1, y - 5, pageW - margin * 2 + 2, 12, 2, 2, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(80, 50, 20);
+    doc.text('TONG CONG:', margin + 2, y + 3);
+    doc.text(`${totalPrice.toLocaleString('vi-VN')}d`, pageW - margin - 2, y + 3, { align: 'right' });
+    y += 18;
+
+    // ── Số món summary ──
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(120, 120, 120);
+    const totalQty = confirmedOrder.reduce((s, i) => s + i.quantity, 0);
+    doc.text(`Tong so mon: ${totalQty} | So loai: ${confirmedOrder.length}`, margin, y);
+    y += 10;
+
+    // ── Footer ──
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(140, 111, 86);
+    doc.text('Cam on quy khach! Hen gap lai!', pageW / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 180);
+    doc.text('Restaurant Management Platform', pageW / 2, y, { align: 'center' });
+
+    // ── Tải xuống ──
+    const tableNum = String(selectedTable.tableNumber).padStart(2, '0');
+    const timestamp = new Date().toISOString().slice(0, 10);
+    doc.save(`hoa-don-ban${tableNum}-${timestamp}.pdf`);
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="h-full relative font-[ui-sans-serif,system-ui,sans-serif]">
@@ -258,7 +385,7 @@ const Dashboard: React.FC = () => {
         {!loading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tables.map((table) => {
-              const style = STATUS_STYLE[table.status];
+              const style      = STATUS_STYLE[table.status];
               const isSelected = selectedTable?.id === table.id;
               const orderCount = tableOrders[table.id]?.reduce((s, i) => s + i.quantity, 0) ?? 0;
               return (
@@ -447,13 +574,14 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* ── Footer ── */}
             <div className="pt-6 border-t border-gray-100 space-y-3 mt-4">
               <div className="flex justify-between items-center px-1">
                 <span className="text-gray-400 text-sm">Tổng cộng:</span>
                 <span className="text-2xl font-semibold text-gray-800">{totalPrice.toLocaleString()}đ</span>
               </div>
 
+              {/* Đặt trước */}
               {selectedTable.status !== 'OCCUPIED' && confirmedOrder.length === 0 && (
                 <button
                   onClick={handleReserve}
@@ -465,6 +593,7 @@ const Dashboard: React.FC = () => {
                 </button>
               )}
 
+              {/* Xác nhận đặt món */}
               <button
                 onClick={handleConfirm}
                 disabled={pendingCart.length === 0 || confirming}
@@ -474,15 +603,28 @@ const Dashboard: React.FC = () => {
                 {confirming ? 'Đang xử lý...' : 'Xác nhận đặt món'}
               </button>
 
+              {/* Xuất hoá đơn + Thanh toán — hiện khi có order đã confirm */}
               {confirmedOrder.length > 0 && (
-                <button
-                  onClick={handlePayment}
-                  disabled={paying}
-                  className="w-full bg-green-600 text-white py-3.5 rounded-2xl font-medium hover:scale-[1.02] transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-                >
-                  {paying ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
-                  {paying ? 'Đang xử lý...' : 'Thanh toán'}
-                </button>
+                <div className="flex gap-2">
+                  {/* Xuất hoá đơn PDF — không cần API */}
+                  <button
+                    onClick={handleExportInvoice}
+                    className="flex-1 border-2 border-[#8C6F56] text-[#8C6F56] py-3.5 rounded-2xl font-medium hover:bg-[#F3E8D6] hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <FileText size={16} />
+                    Hoá đơn
+                  </button>
+
+                  {/* Thanh toán */}
+                  <button
+                    onClick={handlePayment}
+                    disabled={paying}
+                    className="flex-1 bg-green-600 text-white py-3.5 rounded-2xl font-medium hover:scale-[1.02] transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {paying ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                    {paying ? 'Đang xử lý...' : 'Thanh toán'}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -506,12 +648,7 @@ const Dashboard: React.FC = () => {
                 : 'Hành động này không thể hoàn tác.'}
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-400 text-sm hover:bg-gray-50 transition"
-              >
-                Huỷ
-              </button>
+              <button onClick={() => setConfirmDelete(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-400 text-sm hover:bg-gray-50 transition">Huỷ</button>
               <button
                 onClick={handleDeleteTable}
                 disabled={deleting}
@@ -539,42 +676,26 @@ const Dashboard: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Số bàn</label>
-                <input
-                  type="number" min={1} placeholder="VD: 5"
-                  value={addForm.tableNumber}
+                <input type="number" min={1} placeholder="VD: 5" value={addForm.tableNumber}
                   onChange={e => setAddForm(f => ({ ...f, tableNumber: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition"
-                />
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Sức chứa (người)</label>
-                <input
-                  type="number" min={1} placeholder="VD: 4"
-                  value={addForm.capacity}
+                <input type="number" min={1} placeholder="VD: 4" value={addForm.capacity}
                   onChange={e => setAddForm(f => ({ ...f, capacity: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition"
-                />
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">
-                  Vị trí <span className="normal-case text-gray-300">(tuỳ chọn)</span>
-                </label>
-                <input
-                  type="text" placeholder="VD: Tầng 1, Ngoài trời..."
-                  value={addForm.location}
+                <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Vị trí <span className="normal-case text-gray-300">(tuỳ chọn)</span></label>
+                <input type="text" placeholder="VD: Tầng 1, Ngoài trời..." value={addForm.location}
                   onChange={e => setAddForm(f => ({ ...f, location: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition"
-                />
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-[#8C6F56] transition" />
               </div>
               {addError && <p className="text-red-500 text-sm bg-red-50 px-4 py-2 rounded-xl">{addError}</p>}
             </div>
             <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-400 text-sm hover:bg-gray-50 transition"
-              >
-                Huỷ
-              </button>
+              <button onClick={() => setShowAddModal(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-400 text-sm hover:bg-gray-50 transition">Huỷ</button>
               <button
                 onClick={handleAddTable}
                 disabled={adding}

@@ -21,3 +21,13 @@ INSERT INTO MenuItem (category, name, price) VALUES ('Đồ uống', 'Nước É
 
 UPDATE MenuItem_SEQ SET next_val = 11;
 
+CREATE TABLE password_change_log_SEQ (next_val BIGINT NOT NULL);
+INSERT INTO password_change_log_SEQ VALUES (1);
+
+CREATE TABLE password_change_log (
+    id         BIGINT       NOT NULL,
+    staff_id   BIGINT       NOT NULL,
+    staff_name VARCHAR(255) NOT NULL,
+    changed_at DATETIME     NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

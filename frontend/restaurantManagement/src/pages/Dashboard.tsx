@@ -19,6 +19,23 @@ const STATUS_STYLE: Record<TableStatus, { card: string; badge: string; label: st
   MAINTENANCE: { card: 'bg-gray-100  border-gray-200',  badge: 'bg-gray-200 text-gray-500',     label: 'Bảo trì'   },
 };
 
+// ─── API helper ───────────────────────────────────────────────────────────────
+async function orderFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('token');
+  const res = await fetch(path, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message || `HTTP ${res.status}`);
+  }
+  return res.status === 204 ? (undefined as T) : res.json();
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 const Dashboard: React.FC = () => {
 
@@ -33,6 +50,9 @@ const Dashboard: React.FC = () => {
 
   const [tableOrders, setTableOrders]     = useState<Record<number, CartItem[]>>({});
   const [pendingCart, setPendingCart]     = useState<CartItem[]>([]);
+
+  // ── Lưu orderId thật từ DB để dùng khi thanh toán ──
+  const [tableOrderIds, setTableOrderIds] = useState<Record<number, number>>({});
 
   const [confirming, setConfirming]       = useState(false);
   const [paying, setPaying]               = useState(false);
@@ -111,16 +131,53 @@ const Dashboard: React.FC = () => {
   }
   const totalPrice = allItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-  // ── Xác nhận đặt món ──────────────────────────────────────────────────────
+  // ── Xác nhận đặt món — tạo order thật trong DB ───────────────────────────
   const handleConfirm = async () => {
     if (pendingCart.length === 0 || !selectedTable) return;
     setConfirming(true);
     try {
+      // 1. Đổi trạng thái bàn sang OCCUPIED
       if (selectedTable.status !== 'OCCUPIED') {
         const updatedTable = await tableApi.setStatus(selectedTable.id, 'OCCUPIED');
         setTables(prev => prev.map(t => t.id === updatedTable.id ? updatedTable : t));
         setSelectedTable(updatedTable);
       }
+
+      // 2. Tạo order trong DB hoặc thêm món vào order hiện tại
+      const existingOrderId = tableOrderIds[selectedTable.id];
+
+      if (existingOrderId) {
+        // Bàn đã có order → thêm món vào order hiện tại
+        await orderFetch(`/api/orders/${existingOrderId}/items`, {
+          method: 'POST',
+          body: JSON.stringify({
+            items: pendingCart.map(i => ({
+              menuItemId: i.id,
+              name:       i.name,
+              price:      i.price,
+              quantity:   i.quantity,
+            })),
+          }),
+        });
+      } else {
+        // Tạo order mới
+        const newOrder = await orderFetch<{ id: number }>('/api/orders', {
+          method: 'POST',
+          body: JSON.stringify({
+            tableId: selectedTable.id,
+            items: pendingCart.map(i => ({
+              menuItemId: i.id,
+              name:       i.name,
+              price:      i.price,
+              quantity:   i.quantity,
+            })),
+          }),
+        });
+        // Lưu orderId để dùng khi thanh toán
+        setTableOrderIds(prev => ({ ...prev, [selectedTable.id]: newOrder.id }));
+      }
+
+      // 3. Cập nhật state hiển thị
       setTableOrders(prev => {
         const current = prev[selectedTable.id] ?? [];
         const updated = [...current];
@@ -139,14 +196,30 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // ── Thanh toán ────────────────────────────────────────────────────────────
+  // ── Thanh toán — gọi API pay để lưu vào DB cho báo cáo ──────────────────
   const handlePayment = async () => {
     if (!selectedTable) return;
     setPaying(true);
     try {
+      const orderId = tableOrderIds[selectedTable.id];
+
+      // 1. Thanh toán order trong DB (status PENDING → PAID, paidAt = now)
+      //    Báo cáo query orders WHERE status='PAID' nên bước này bắt buộc
+      if (orderId) {
+        await orderFetch(`/api/orders/${orderId}/pay`, { method: 'PUT' });
+      }
+
+      // 2. Đổi trạng thái bàn về AVAILABLE
       const updated = await tableApi.setStatus(selectedTable.id, 'AVAILABLE');
       setTables(prev => prev.map(t => t.id === updated.id ? updated : t));
+
+      // 3. Dọn state
       setTableOrders(prev => {
+        const next = { ...prev };
+        delete next[selectedTable.id];
+        return next;
+      });
+      setTableOrderIds(prev => {
         const next = { ...prev };
         delete next[selectedTable.id];
         return next;
@@ -167,11 +240,8 @@ const Dashboard: React.FC = () => {
     try {
       await tableApi.delete(selectedTable.id);
       setTables(prev => prev.filter(t => t.id !== selectedTable.id));
-      setTableOrders(prev => {
-        const next = { ...prev };
-        delete next[selectedTable.id];
-        return next;
-      });
+      setTableOrders(prev => { const next = { ...prev }; delete next[selectedTable.id]; return next; });
+      setTableOrderIds(prev => { const next = { ...prev }; delete next[selectedTable.id]; return next; });
       setSelectedTable(null);
       setPendingCart([]);
       setConfirmDelete(false);
@@ -234,46 +304,36 @@ const Dashboard: React.FC = () => {
     const margin = 12;
     let y = 14;
 
-    // ── Header ──
-    doc.setFillColor(140, 111, 86); // màu nâu #8C6F56
+    doc.setFillColor(140, 111, 86);
     doc.rect(0, 0, pageW, 28, 'F');
-
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
     doc.text('HOA DON THANH TOAN', pageW / 2, y + 2, { align: 'center' });
-
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text('Restaurant Management Platform', pageW / 2, y + 9, { align: 'center' });
     y = 34;
 
-    // ── Thông tin bàn & ngày ──
     doc.setTextColor(50, 50, 50);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.text(`BAN ${String(selectedTable.tableNumber).padStart(2, '0')}`, margin, y);
-
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text(`Suc chua: ${selectedTable.capacity} nguoi`, pageW - margin, y, { align: 'right' });
     y += 5;
-
     doc.setFontSize(8.5);
     doc.setTextColor(120, 120, 120);
     doc.text(`Ngay: ${new Date().toLocaleString('vi-VN')}`, margin, y);
-    if (selectedTable.location) {
-      doc.text(`Vi tri: ${selectedTable.location}`, pageW - margin, y, { align: 'right' });
-    }
+    if (selectedTable.location) doc.text(`Vi tri: ${selectedTable.location}`, pageW - margin, y, { align: 'right' });
     y += 7;
 
-    // ── Đường kẻ ──
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
     doc.line(margin, y, pageW - margin, y);
     y += 5;
 
-    // ── Header bảng món ──
     doc.setTextColor(50, 50, 50);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -285,17 +345,13 @@ const Dashboard: React.FC = () => {
     doc.line(margin, y, pageW - margin, y);
     y += 5;
 
-    // ── Danh sách món ──
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-
     confirmedOrder.forEach((item, idx) => {
-      // Xen kẽ nền nhẹ
       if (idx % 2 === 0) {
         doc.setFillColor(250, 247, 242);
         doc.rect(margin - 1, y - 4, pageW - margin * 2 + 2, 7, 'F');
       }
-
       doc.setTextColor(50, 50, 50);
       const nameLines = doc.splitTextToSize(item.name, 55);
       doc.text(nameLines, margin, y);
@@ -311,10 +367,8 @@ const Dashboard: React.FC = () => {
     doc.line(margin, y, pageW - margin, y);
     y += 7;
 
-    // ── Tổng tiền ──
-    doc.setFillColor(243, 232, 214); // nền vàng nhạt
+    doc.setFillColor(243, 232, 214);
     doc.roundedRect(margin - 1, y - 5, pageW - margin * 2 + 2, 12, 2, 2, 'F');
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(80, 50, 20);
@@ -322,7 +376,6 @@ const Dashboard: React.FC = () => {
     doc.text(`${totalPrice.toLocaleString('vi-VN')}d`, pageW - margin - 2, y + 3, { align: 'right' });
     y += 18;
 
-    // ── Số món summary ──
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(120, 120, 120);
@@ -330,7 +383,6 @@ const Dashboard: React.FC = () => {
     doc.text(`Tong so mon: ${totalQty} | So loai: ${confirmedOrder.length}`, margin, y);
     y += 10;
 
-    // ── Footer ──
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.2);
     doc.line(margin, y, pageW - margin, y);
@@ -346,8 +398,7 @@ const Dashboard: React.FC = () => {
     doc.setTextColor(180, 180, 180);
     doc.text('Restaurant Management Platform', pageW / 2, y, { align: 'center' });
 
-    // ── Tải xuống ──
-    const tableNum = String(selectedTable.tableNumber).padStart(2, '0');
+    const tableNum  = String(selectedTable.tableNumber).padStart(2, '0');
     const timestamp = new Date().toISOString().slice(0, 10);
     doc.save(`hoa-don-ban${tableNum}-${timestamp}.pdf`);
   };
@@ -416,20 +467,13 @@ const Dashboard: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  {table.location && (
-                    <p className="mt-1 text-xs text-gray-400">{table.location}</p>
-                  )}
+                  {table.location && <p className="mt-1 text-xs text-gray-400">{table.location}</p>}
                   {table.status !== 'OCCUPIED' && (
                     <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        setSelectedTable(table);
-                        setConfirmDelete(true);
-                      }}
+                      onClick={e => { e.stopPropagation(); setSelectedTable(table); setConfirmDelete(true); }}
                       className="mt-3 flex items-center gap-1.5 text-xs text-gray-300 hover:text-red-400 transition-colors"
                     >
-                      <Trash2 size={13} />
-                      Xoá bàn
+                      <Trash2 size={13} /> Xoá bàn
                     </button>
                   )}
                 </div>
@@ -455,10 +499,7 @@ const Dashboard: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="p-2 bg-gray-100 rounded-full hover:bg-red-50 hover:text-red-500 transition"
-                >
+                <button onClick={() => setConfirmDelete(true)} className="p-2 bg-gray-100 rounded-full hover:bg-red-50 hover:text-red-500 transition">
                   <Trash2 size={18} />
                 </button>
                 <button onClick={handleClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
@@ -510,13 +551,9 @@ const Dashboard: React.FC = () => {
                           <p className="text-gray-400 text-xs">{(item.price * item.quantity).toLocaleString()}đ</p>
                         </div>
                         <div className="flex items-center space-x-3 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
-                          <button onClick={() => removeFromPending(item.id)} className="p-1 hover:text-red-500">
-                            <Minus size={14} />
-                          </button>
+                          <button onClick={() => removeFromPending(item.id)} className="p-1 hover:text-red-500"><Minus size={14} /></button>
                           <span className="text-sm w-4 text-center">{item.quantity}</span>
-                          <button onClick={() => addToPending(item)} className="p-1 hover:text-green-500">
-                            <Plus size={14} />
-                          </button>
+                          <button onClick={() => addToPending(item)} className="p-1 hover:text-green-500"><Plus size={14} /></button>
                         </div>
                       </div>
                     ))}
@@ -581,7 +618,6 @@ const Dashboard: React.FC = () => {
                 <span className="text-2xl font-semibold text-gray-800">{totalPrice.toLocaleString()}đ</span>
               </div>
 
-              {/* Đặt trước */}
               {selectedTable.status !== 'OCCUPIED' && confirmedOrder.length === 0 && (
                 <button
                   onClick={handleReserve}
@@ -593,7 +629,6 @@ const Dashboard: React.FC = () => {
                 </button>
               )}
 
-              {/* Xác nhận đặt món */}
               <button
                 onClick={handleConfirm}
                 disabled={pendingCart.length === 0 || confirming}
@@ -603,10 +638,8 @@ const Dashboard: React.FC = () => {
                 {confirming ? 'Đang xử lý...' : 'Xác nhận đặt món'}
               </button>
 
-              {/* Xuất hoá đơn + Thanh toán — hiện khi có order đã confirm */}
               {confirmedOrder.length > 0 && (
                 <div className="flex gap-2">
-                  {/* Xuất hoá đơn PDF — không cần API */}
                   <button
                     onClick={handleExportInvoice}
                     className="flex-1 border-2 border-[#8C6F56] text-[#8C6F56] py-3.5 rounded-2xl font-medium hover:bg-[#F3E8D6] hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -614,8 +647,6 @@ const Dashboard: React.FC = () => {
                     <FileText size={16} />
                     Hoá đơn
                   </button>
-
-                  {/* Thanh toán */}
                   <button
                     onClick={handlePayment}
                     disabled={paying}
@@ -643,17 +674,12 @@ const Dashboard: React.FC = () => {
               Xoá bàn {String(selectedTable.tableNumber).padStart(2, '0')}?
             </h3>
             <p className="text-gray-400 text-sm mb-6">
-              {selectedTable.status === 'OCCUPIED'
-                ? 'Bàn đang có khách, bạn chắc chắn muốn xoá?'
-                : 'Hành động này không thể hoàn tác.'}
+              {selectedTable.status === 'OCCUPIED' ? 'Bàn đang có khách, bạn chắc chắn muốn xoá?' : 'Hành động này không thể hoàn tác.'}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-400 text-sm hover:bg-gray-50 transition">Huỷ</button>
-              <button
-                onClick={handleDeleteTable}
-                disabled={deleting}
-                className="flex-1 py-3 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
+              <button onClick={handleDeleteTable} disabled={deleting}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
                 {deleting && <Loader2 size={15} className="animate-spin" />}
                 {deleting ? 'Đang xoá...' : 'Xoá bàn'}
               </button>
@@ -669,9 +695,7 @@ const Dashboard: React.FC = () => {
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-8">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold text-gray-800">Thêm bàn mới</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-2 bg-gray-100 rounded-full hover:bg-red-50 hover:text-red-500 transition">
-                <X size={18} />
-              </button>
+              <button onClick={() => setShowAddModal(false)} className="p-2 bg-gray-100 rounded-full hover:bg-red-50 hover:text-red-500 transition"><X size={18} /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -696,11 +720,8 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="flex gap-3 mt-8">
               <button onClick={() => setShowAddModal(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-400 text-sm hover:bg-gray-50 transition">Huỷ</button>
-              <button
-                onClick={handleAddTable}
-                disabled={adding}
-                className="flex-1 py-3 rounded-xl bg-[#8C6F56] text-white text-sm font-medium hover:scale-[1.02] active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+              <button onClick={handleAddTable} disabled={adding}
+                className="flex-1 py-3 rounded-xl bg-[#8C6F56] text-white text-sm font-medium hover:scale-[1.02] active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {adding && <Loader2 size={15} className="animate-spin" />}
                 {adding ? 'Đang thêm...' : 'Thêm bàn'}
               </button>

@@ -11,6 +11,11 @@ interface Staff {
   shift: string;
   username?: string; // có thể chưa có tài khoản
 }
+interface PasswordLog {
+  id: number;
+  staffName: string; 
+  changedAt: string;
+}
 
 interface SetAccountForm {
   username: string;
@@ -51,6 +56,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 const api = {
   getAll: () => apiFetch<Staff[]>(BASE_URL),
+  getPasswordLogs: () => apiFetch<PasswordLog[]>('/api/staff/password-logs'),
   setAccount: (id: number, username: string, password: string) =>
     apiFetch<Staff>(`${BASE_URL}/${id}/account`, {
       method: 'PUT',
@@ -62,30 +68,36 @@ const api = {
 
 // ─── Role badge ───────────────────────────────────────────────────────────────
 const ROLE_COLOR: Record<string, string> = {
-  'Quản lý':  'bg-amber-100 text-amber-700',
-  'Phục vụ':  'bg-blue-100 text-blue-600',
+  'Quản lý': 'bg-amber-100 text-amber-700',
+  'Phục vụ': 'bg-blue-100 text-blue-600',
   'Thu ngân': 'bg-green-100 text-green-700',
-  'Bếp':      'bg-orange-100 text-orange-600',
-  'Bảo vệ':   'bg-gray-100 text-gray-600',
+  'Bếp': 'bg-orange-100 text-orange-600',
+  'Bảo vệ': 'bg-gray-100 text-gray-600',
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const AccountManagementPage: React.FC = () => {
-  const [staff, setStaff]           = useState<Staff[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [search, setSearch]         = useState('');
+  const [search, setSearch] = useState('');
 
-  const [target, setTarget]         = useState<Staff | null>(null);
-  const [form, setForm]             = useState<SetAccountForm>(EMPTY_FORM);
-  const [showPass, setShowPass]     = useState(false);
+  const [target, setTarget] = useState<Staff | null>(null);
+  const [form, setForm] = useState<SetAccountForm>(EMPTY_FORM);
+  const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [formError, setFormError]   = useState<string | null>(null);
-  const [saving, setSaving]         = useState(false);
-  const [successId, setSuccessId]   = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [successId, setSuccessId] = useState<number | null>(null);
 
   const [removeTarget, setRemoveTarget] = useState<Staff | null>(null);
-  const [removing, setRemoving]         = useState(false);
+  const [logs, setLogs] = useState<{ id: number; staffName: string; changedAt: string }[]>([]);
+
+  useEffect(() => {
+    loadStaff();
+    api.getPasswordLogs().then(setLogs).catch(() => { });
+  }, []);
+  const [removing, setRemoving] = useState(false);
 
   // Chặn non-manager
   if (!isManager()) {
@@ -127,9 +139,9 @@ const AccountManagementPage: React.FC = () => {
 
   // ── Lưu tài khoản ──
   const handleSave = async () => {
-    if (!form.username.trim())    { setFormError('Vui lòng nhập tên đăng nhập'); return; }
+    if (!form.username.trim()) { setFormError('Vui lòng nhập tên đăng nhập'); return; }
     if (form.username.includes(' ')) { setFormError('Tên đăng nhập không được có khoảng trắng'); return; }
-    if (!form.password)           { setFormError('Vui lòng nhập mật khẩu'); return; }
+    if (!form.password) { setFormError('Vui lòng nhập mật khẩu'); return; }
     if (form.password.length < 6) { setFormError('Mật khẩu tối thiểu 6 ký tự'); return; }
     if (form.password !== form.confirmPassword) { setFormError('Mật khẩu xác nhận không khớp'); return; }
     if (!target) return;
@@ -163,6 +175,7 @@ const AccountManagementPage: React.FC = () => {
       setRemoving(false);
     }
   };
+
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -405,6 +418,25 @@ const AccountManagementPage: React.FC = () => {
           </div>
         </div>
       )}
+      {logs.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <KeyRound size={14} className="text-[#8C6F56]" />
+                  Lịch sử đổi mật khẩu
+                </h3>
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  {logs.map((log, idx) => (
+                    <div key={log.id}
+                      className={`flex items-center justify-between px-5 py-3 text-sm ${idx < logs.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                      <span className="font-medium text-gray-700">{log.staffName}</span>
+                      <span className="text-gray-400 text-xs">
+                        {new Date(log.changedAt).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
     </div>
   );
 };

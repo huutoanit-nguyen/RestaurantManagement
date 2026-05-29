@@ -5,11 +5,15 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.SecurityContext;
 import web.com.exception.ErrorResponse;
+import web.com.model.PasswordChangeLog;
 import web.com.model.Staff;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
@@ -95,7 +99,7 @@ public class StaffResource {
                         .build());
     }
 
-    // PUT /api/staff/{id}/account 
+    // PUT /api/staff/{id}/account
     @PUT
     @Path("/{id}/account")
     @Transactional
@@ -123,5 +127,64 @@ public class StaffResource {
     }
 
     public record AccountRequest(String username, String password) {
+    }
+
+    // GET /api/staff/me — lấy thông tin bản thân
+    @GET
+    @Path("/me")
+    @RolesAllowed({ "Quản lý", "Phục vụ", "Thu ngân", "Bếp", "Bảo vệ" })
+    public Staff getMe(@Context SecurityContext ctx) {
+        String username = ctx.getUserPrincipal().getName();
+        Staff staff = Staff.find("username", username).firstResult();
+        if (staff == null)
+            throw notFound(-1L);
+        return staff;
+    }
+
+    // PUT /api/staff/me/password — đổi mật khẩu bản thân
+    @PUT
+    @Path("/me/password")
+    @Transactional
+    @RolesAllowed({ "Quản lý", "Phục vụ", "Thu ngân", "Bếp", "Bảo vệ" })
+    public Response changeMyPassword(
+            @Context SecurityContext ctx,
+            ChangePasswordRequest req) {
+        String username = ctx.getUserPrincipal().getName();
+        Staff staff = Staff.find("username", username).firstResult();
+        if (staff == null)
+            throw notFound(-1L);
+
+        if (!BcryptUtil.matches(req.oldPassword(), staff.password)) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("Mật khẩu cũ không đúng"))
+                    .build();
+        }
+        if (req.newPassword().length() < 6) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("Mật khẩu mới tối thiểu 6 ký tự"))
+                    .build();
+        }
+
+        staff.password = BcryptUtil.bcryptHash(req.newPassword(), 12);
+        staff.persistAndFlush();
+
+        // Ghi log để admin xem
+        PasswordChangeLog log = new PasswordChangeLog();
+        log.staffId = staff.id;
+        log.staffName = staff.fullName;
+        log.changedAt = LocalDateTime.now();
+        log.persist();
+
+        return Response.ok().build();
+    }
+
+    public record ChangePasswordRequest(String oldPassword, String newPassword) {
+    }
+
+    @GET
+    @Path("/password-logs")
+    @RolesAllowed("Quản lý")
+    public List<PasswordChangeLog> getPasswordLogs() {
+        return PasswordChangeLog.find("ORDER BY changedAt DESC").list();
     }
 }

@@ -7,7 +7,9 @@ import {
   LineChart,
   LogOut,
   KeyRound,
+  UserCircle,
 } from 'lucide-react';
+import ProfileModal from '@/pages/ProfileModal';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function isManager(): boolean {
@@ -17,9 +19,10 @@ function isManager(): boolean {
 
 const Sidebar = () => {
   const navigate  = useNavigate();
-  const location  = useLocation(); 
-  const [displayName, setDisplayName] = useState<string>('Admin');
-  const [userRole, setUserRole]       = useState<string>('');
+  const location  = useLocation();
+  const [displayName, setDisplayName]   = useState<string>('Admin');
+  const [userRole, setUserRole]         = useState<string>('');
+  const [showProfile, setShowProfile]   = useState(false);
 
   useEffect(() => {
     const name = localStorage.getItem('userName');
@@ -28,88 +31,82 @@ const Sidebar = () => {
     if (role) setUserRole(role);
   }, []);
 
-  // ── Menu items ──────────────────────────────────────────────────────────────
   const menuItems = [
-    { id: 'tables',  label: 'Sơ đồ bàn', icon: <LayoutDashboard size={22} strokeWidth={2} /> },
-    { id: 'menu',    label: 'Thực đơn',   icon: <Utensils size={22} strokeWidth={2} /> },
-    { id: 'staff',   label: 'Nhân viên',  icon: <Users size={22} strokeWidth={2} /> },
-    { id: 'reports', label: 'Báo cáo',    icon: <LineChart size={22} strokeWidth={2} /> },
-    // Chỉ quản lý mới thấy mục này — filter bên dưới
-    {
-      id: 'accounts',
-      label: 'Tài khoản',
-      icon: <KeyRound size={22} strokeWidth={2} />,
-      managerOnly: true,
-    },
+    { id: 'tables',   label: 'Sơ đồ bàn', icon: <LayoutDashboard size={22} strokeWidth={2} /> },
+    { id: 'menu',     label: 'Thực đơn',   icon: <Utensils size={22} strokeWidth={2} /> },
+    { id: 'staff',    label: 'Nhân viên',  icon: <Users size={22} strokeWidth={2} /> },
+    { id: 'reports',  label: 'Báo cáo',    icon: <LineChart size={22} strokeWidth={2} /> },
+    { id: 'accounts', label: 'Tài khoản',  icon: <KeyRound size={22} strokeWidth={2} />, managerOnly: true },
   ];
 
-  const visibleItems = menuItems.filter(item =>
-    !item.managerOnly || isManager()
-  );
-
+  const visibleItems = menuItems.filter(item => !item.managerOnly || isManager());
   const active = location.pathname.replace('/', '') || 'tables';
 
-  const handleNav = (id: string) => navigate(`/${id}`);
-
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
+  const handleNav     = (id: string) => navigate(`/${id}`);
+  const handleLogout  = () => { localStorage.clear(); navigate('/login'); };
 
   return (
-    <aside className="sticky top-0 w-64 bg-[#F3E8D6] h-screen p-6 flex flex-col shadow-lg border-r border-gray-200/50">
+    <>
+      <aside className="sticky top-0 w-64 bg-[#F3E8D6] h-screen p-6 flex flex-col shadow-lg border-r border-gray-200/50">
 
-      {/* Brand */}
-      <div className="mb-10 px-2">
-        <h1 className="text-2xl font-semibold text-[#333] tracking-tight">Restaurant</h1>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-            {displayName}
-          </p>
-        </div>
-        {/* Hiện role nhỏ bên dưới tên */}
-        {userRole && (
-          <p className="text-[10px] text-[#8C6F56] font-medium mt-0.5 px-0.5">{userRole}</p>
-        )}
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 space-y-2">
-        {visibleItems.map((item) => {
-          const isActive = active === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleNav(item.id)}
-              className={`flex items-center space-x-4 w-full p-4 rounded-2xl transition-all duration-200 group ${
-                isActive
-                  ? 'bg-[#8C6F56] text-white shadow-md'
-                  : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
-              }`}
-            >
-              <div className={`transition-colors duration-200 ${
-                isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-900'
-              }`}>
-                {item.icon}
-              </div>
-              <span className="font-semibold tracking-wide">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Logout */}
-      <div className="pt-6 border-t border-gray-300/30">
+        {/* Brand — click để mở profile */}
         <button
-          onClick={handleLogout}
-          className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 transition-all group"
+          onClick={() => setShowProfile(true)}
+          className="mb-10 px-2 text-left group w-full"
         >
-          <LogOut size={20} className="group-hover:translate-x-1 transition-transform" />
-          <span className="font-medium">Đăng xuất</span>
+          <h1 className="text-2xl font-semibold text-[#333] tracking-tight">Galadan</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest group-hover:text-[#8C6F56] transition">
+              {displayName}
+            </p>
+            <UserCircle size={13} className="text-gray-300 group-hover:text-[#8C6F56] transition ml-auto" />
+          </div>
+          {userRole && (
+            <p className="text-[10px] text-[#8C6F56] font-medium mt-0.5 px-0.5">{userRole}</p>
+          )}
         </button>
-      </div>
-    </aside>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-2">
+          {visibleItems.map((item) => {
+            const isActive = active === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNav(item.id)}
+                className={`flex items-center space-x-4 w-full p-4 rounded-2xl transition-all duration-200 group ${
+                  isActive
+                    ? 'bg-[#8C6F56] text-white shadow-md'
+                    : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                }`}
+              >
+                <div className={`transition-colors duration-200 ${
+                  isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-900'
+                }`}>
+                  {item.icon}
+                </div>
+                <span className="font-semibold tracking-wide">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Logout */}
+        <div className="pt-6 border-t border-gray-300/30">
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 transition-all group"
+          >
+            <LogOut size={20} className="group-hover:translate-x-1 transition-transform" />
+            <span className="font-medium">Đăng xuất</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Profile Modal */}
+      <ProfileModal open={showProfile} onClose={() => setShowProfile(false)} />
+    </>
   );
 };
 

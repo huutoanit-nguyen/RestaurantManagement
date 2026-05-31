@@ -13,7 +13,7 @@ interface Staff {
 }
 interface PasswordLog {
   id: number;
-  staffName: string; 
+  staffName: string;
   changedAt: string;
 }
 
@@ -91,13 +91,13 @@ const AccountManagementPage: React.FC = () => {
   const [successId, setSuccessId] = useState<number | null>(null);
 
   const [removeTarget, setRemoveTarget] = useState<Staff | null>(null);
-  const [logs, setLogs] = useState<{ id: number; staffName: string; changedAt: string }[]>([]);
+  const [logs, setLogs] = useState<PasswordLog[]>([]);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     loadStaff();
     api.getPasswordLogs().then(setLogs).catch(() => { });
   }, []);
-  const [removing, setRemoving] = useState(false);
 
   // Chặn non-manager
   if (!isManager()) {
@@ -122,8 +122,6 @@ const AccountManagementPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { loadStaff(); }, []);
-
   const filtered = staff.filter(s =>
     (s.fullName ?? '').toLowerCase().includes(search.toLowerCase())
   );
@@ -137,12 +135,37 @@ const AccountManagementPage: React.FC = () => {
     setShowConfirm(false);
   };
 
+  const checkPasswordStrength = (password: string) => {
+    if (!password) return { score: 0, label: '', color: 'bg-gray-200' };
+
+    let score = 0;
+    if (password.length >= 8) score++; // Đủ độ dài tối thiểu mới (8 ký tự)
+    if (/[A-Z]/.test(password)) score++; // Có chữ hoa
+    if (/[0-9]/.test(password)) score++; // Có số
+    if (/[^A-Za-z0-9]/.test(password)) score++; // Có ký tự đặc biệt
+
+    switch (score) {
+      case 1: return { score: 25, label: 'Yếu', color: 'bg-red-500 text-red-500' };
+      case 2: return { score: 50, label: 'Trung bình', color: 'bg-amber-500 text-amber-500' };
+      case 3: return { score: 75, label: 'Mạnh', color: 'bg-green-500 text-green-500' };
+      case 4: return { score: 100, label: 'Rất mạnh', color: 'bg-blue-500 text-blue-500' };
+      default: return { score: 10, label: 'Quá yếu', color: 'bg-red-600 text-red-600' };
+    }
+  };
+
   // ── Lưu tài khoản ──
   const handleSave = async () => {
     if (!form.username.trim()) { setFormError('Vui lòng nhập tên đăng nhập'); return; }
     if (form.username.includes(' ')) { setFormError('Tên đăng nhập không được có khoảng trắng'); return; }
     if (!form.password) { setFormError('Vui lòng nhập mật khẩu'); return; }
-    if (form.password.length < 6) { setFormError('Mật khẩu tối thiểu 6 ký tự'); return; }
+    
+    // Đồng bộ điều kiện bảo mật với Backend Backend (>=8 ký tự, có viết hoa, có số)
+    const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+    if (!passwordRegex.test(form.password)) { 
+      setFormError('Mật khẩu tối thiểu 8 ký tự, bao gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số'); 
+      return; 
+    }
+    
     if (form.password !== form.confirmPassword) { setFormError('Mật khẩu xác nhận không khớp'); return; }
     if (!target) return;
 
@@ -154,6 +177,9 @@ const AccountManagementPage: React.FC = () => {
       setTarget(null);
       setSuccessId(target.id);
       setTimeout(() => setSuccessId(null), 3000);
+      
+      // Reload lại lịch sử đổi pass để cập nhật log mới nhất
+      api.getPasswordLogs().then(setLogs).catch(() => {});
     } catch (e: any) {
       setFormError(e.message ?? 'Lưu thất bại, thử lại');
     } finally {
@@ -176,8 +202,6 @@ const AccountManagementPage: React.FC = () => {
     }
   };
 
-
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 p-4 md:p-8 font-[ui-sans-serif,system-ui,sans-serif] h-full bg-white border-l border-gray-200 overflow-y-auto">
 
@@ -232,7 +256,6 @@ const AccountManagementPage: React.FC = () => {
                 key={s.id}
                 className={`grid grid-cols-[2fr_1fr_1fr_140px] px-5 py-3.5 items-center hover:bg-[#FAF7F2] transition-colors ${idx < filtered.length - 1 ? 'border-b border-gray-50' : ''}`}
               >
-                {/* Tên */}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#F0E8DF] flex items-center justify-center flex-shrink-0">
                     <Users size={15} className="text-[#8C6F56]" />
@@ -243,12 +266,10 @@ const AccountManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Role */}
                 <span className={`text-xs font-medium px-2 py-1 rounded-full w-fit ${ROLE_COLOR[s.role] ?? 'bg-gray-100 text-gray-500'}`}>
                   {s.role}
                 </span>
 
-                {/* Trạng thái tài khoản */}
                 <div className="flex items-center gap-1.5">
                   {s.username ? (
                     <>
@@ -263,7 +284,6 @@ const AccountManagementPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Actions */}
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => openSetAccount(s)}
@@ -312,7 +332,7 @@ const AccountManagementPage: React.FC = () => {
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Tên đăng nhập</label>
                 <input
                   type="text"
-                  placeholder="VD: nguyenvana"
+                  placeholder="VD: toannh"
                   value={form.username}
                   autoComplete="off"
                   onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
@@ -320,29 +340,47 @@ const AccountManagementPage: React.FC = () => {
                 />
               </div>
 
-              {/* Password */}
+              {/* Password - ĐÃ FIX CON MẮT */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Mật khẩu mới</label>
                 <div className="relative">
                   <input
                     type={showPass ? 'text' : 'password'}
-                    placeholder="Tối thiểu 6 ký tự"
+                    placeholder="Tối thiểu 8 ký tự, gồm chữ hoa & số"
                     value={form.password}
                     autoComplete="new-password"
                     onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                    className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-2.5 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
                   >
                     {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+                
+                {/* Khối hiển thị độ bảo mật nằm độc lập bên dưới, không làm lệch icon con mắt */}
+                {form.password && (
+                  <div className="mt-2.5 bg-gray-50 p-2.5 rounded-xl border border-gray-100 transition-all">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[11px] text-gray-400">Độ bảo mật:</span>
+                      <span className={`text-[11px] font-bold ${checkPasswordStrength(form.password).color.split(' ')[1]}`}>
+                        {checkPasswordStrength(form.password).label}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${checkPasswordStrength(form.password).color.split(' ')[0]}`}
+                        style={{ width: `${checkPasswordStrength(form.password).score}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Confirm password */}
+              {/* Confirm password - ĐÃ FIX CON MẮT */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Xác nhận mật khẩu</label>
                 <div className="relative">
@@ -352,12 +390,12 @@ const AccountManagementPage: React.FC = () => {
                     value={form.confirmPassword}
                     autoComplete="new-password"
                     onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                    className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-2.5 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirm(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
                   >
                     {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
@@ -418,25 +456,27 @@ const AccountManagementPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Logs */}
       {logs.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                  <KeyRound size={14} className="text-[#8C6F56]" />
-                  Lịch sử đổi mật khẩu
-                </h3>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                  {logs.map((log, idx) => (
-                    <div key={log.id}
-                      className={`flex items-center justify-between px-5 py-3 text-sm ${idx < logs.length - 1 ? 'border-b border-gray-50' : ''}`}>
-                      <span className="font-medium text-gray-700">{log.staffName}</span>
-                      <span className="text-gray-400 text-xs">
-                        {new Date(log.changedAt).toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+        <div className="mt-8">
+          <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <KeyRound size={14} className="text-[#8C6F56]" />
+            Lịch sử đổi mật khẩu
+          </h3>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            {logs.map((log, idx) => (
+              <div key={log.id}
+                className={`flex items-center justify-between px-5 py-3 text-sm ${idx < logs.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                <span className="font-medium text-gray-700">{log.staffName}</span>
+                <span className="text-gray-400 text-xs">
+                  {new Date(log.changedAt).toLocaleString('vi-VN')}
+                </span>
               </div>
-            )}
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -23,10 +23,11 @@ import io.quarkus.elytron.security.common.BcryptUtil;
 @Consumes(MediaType.APPLICATION_JSON)
 public class StaffResource {
 
+    // Regex check độ khó: Ít nhất 8 ký tự, có 1 chữ hoa, 1 chữ thường, 1 chữ số
+    private static final String PASSWORD_REGEX = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,}$";
+    private static final String PASSWORD_ERROR_MSG = "Mật khẩu không đủ an toàn! (Phải từ 8 ký tự trở lên, bao gồm chữ hoa, chữ thường và số).";
+
     // GET /api/staff
-    // GET /api/staff?role=Bếp
-    // GET /api/staff?shift=Ca sáng
-    // GET /api/staff?search=Nguyễn
     @GET
     @PermitAll
     public List<Staff> getAll(
@@ -81,7 +82,7 @@ public class StaffResource {
         boolean deleted = Staff.deleteById(id);
         if (!deleted)
             throw notFound(id);
-        return Response.noContent().build(); // 204
+        return Response.noContent().build();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -99,19 +100,30 @@ public class StaffResource {
                         .build());
     }
 
-    // PUT /api/staff/{id}/account
+    // PUT /api/staff/{id}/account — Quản lý cấp/đổi tài khoản cho nhân viên
     @PUT
     @Path("/{id}/account")
     @Transactional
     @RolesAllowed("Quản lý")
-    public Staff setAccount(@PathParam("id") Long id, AccountRequest req) {
+    public Response setAccount(@PathParam("id") Long id, AccountRequest req) {
         Staff entity = Staff.findById(id);
-        if (entity == null)
-            throw new WebApplicationException(Response.Status.NOT_FOUND);
+        if (entity == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse("Không tìm thấy nhân viên"))
+                    .build();
+        }
+
+        // THÊM: Kiểm tra độ khó mật khẩu khi Admin tạo/cập nhật cho nhân viên
+        if (req.password() == null || !req.password().matches(PASSWORD_REGEX)) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse(PASSWORD_ERROR_MSG))
+                    .build();
+        }
+
         entity.username = req.username();
-        entity.setPassword(req.password);
+        entity.setPassword(req.password()); // Hàm setPassword này trong model của Toản tự Bcrypt rồi đúng không?
         entity.persistAndFlush();
-        return entity;
+        return Response.ok(entity).build();
     }
 
     // DELETE /api/staff/{id}/account — xoá tài khoản
@@ -141,7 +153,7 @@ public class StaffResource {
         return staff;
     }
 
-    // PUT /api/staff/me/password — đổi mật khẩu bản thân
+    // PUT /api/staff/me/password — Bản thân tự đổi mật khẩu
     @PUT
     @Path("/me/password")
     @Transactional
@@ -154,17 +166,21 @@ public class StaffResource {
         if (staff == null)
             throw notFound(-1L);
 
+        // 1. Kiểm tra mật khẩu cũ
         if (!BcryptUtil.matches(req.oldPassword(), staff.password)) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new ErrorResponse("Mật khẩu cũ không đúng"))
                     .build();
         }
-        if (req.newPassword().length() < 6) {
+
+        // 2. THÊM: Kiểm tra mật khẩu mới theo chuẩn độ khó (Chữ hoa, chữ thường, số, >= 8 ký tự)
+        if (req.newPassword() == null || !req.newPassword().matches(PASSWORD_REGEX)) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("Mật khẩu mới tối thiểu 6 ký tự"))
+                    .entity(new ErrorResponse(PASSWORD_ERROR_MSG))
                     .build();
         }
 
+        // Mã hóa mật khẩu mới và lưu
         staff.password = BcryptUtil.bcryptHash(req.newPassword(), 12);
         staff.persistAndFlush();
 

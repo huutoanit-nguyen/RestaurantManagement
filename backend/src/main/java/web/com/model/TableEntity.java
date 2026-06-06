@@ -2,6 +2,8 @@ package web.com.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
+
 import java.util.List;
 
 @Entity
@@ -15,6 +17,7 @@ public class TableEntity extends PanacheEntityBase {
     @Column(name = "table_number", nullable = false, unique = true)
     public Integer tableNumber;
 
+    @Min(value = 1, message = "Sức chứa phải lớn hơn 0")
     @Column(name = "capacity", nullable = false)
     public Integer capacity;
 

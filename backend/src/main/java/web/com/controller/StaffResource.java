@@ -51,15 +51,42 @@ public class StaffResource {
         return findOrThrow(id);
     }
 
-    // POST /api/staff
-    @POST
-    @Transactional
-    @RolesAllowed("Quản lý")
-    public Response create(@Valid Staff staff) {
-        staff.id = null;
-        staff.persist();
-        return Response.status(Response.Status.CREATED).entity(staff).build();
+    // POST /api/staff — tạo staff không có tài khoản (username/password để null)
+@POST
+@Transactional
+@RolesAllowed("Quản lý")
+public Response create(@Valid Staff staff) {
+    staff.id = null;
+    staff.username = null; // ✅ Tạo nhân viên trước, cấp tài khoản sau qua /account
+    staff.password = null;
+    staff.persist();
+    return Response.status(Response.Status.CREATED).entity(staff).build();
+}
+
+// PUT /api/staff/{id}/account — cấp/đổi tài khoản
+@PUT
+@Path("/{id}/account")
+@Transactional
+@RolesAllowed("Quản lý")
+public Response setAccount(@PathParam("id") Long id, AccountRequest req) {
+    Staff entity = Staff.findById(id);
+    if (entity == null) {
+        return Response.status(Response.Status.NOT_FOUND)
+                .entity(new ErrorResponse("Không tìm thấy nhân viên"))
+                .build();
     }
+
+    if (req.password() == null || !req.password().matches(PASSWORD_REGEX)) {
+        return Response.status(Response.Status.BAD_REQUEST)
+                .entity(new ErrorResponse(PASSWORD_ERROR_MSG))
+                .build();
+    }
+
+    entity.username = req.username();
+    entity.hashPassword(req.password()); // ✅ Hash đúng 1 lần duy nhất
+    entity.persistAndFlush();
+    return Response.ok(entity).build();
+}
 
     // PUT /api/staff/{id}
     @PUT
@@ -100,31 +127,7 @@ public class StaffResource {
                         .build());
     }
 
-    // PUT /api/staff/{id}/account — Quản lý cấp/đổi tài khoản cho nhân viên
-    @PUT
-    @Path("/{id}/account")
-    @Transactional
-    @RolesAllowed("Quản lý")
-    public Response setAccount(@PathParam("id") Long id, AccountRequest req) {
-        Staff entity = Staff.findById(id);
-        if (entity == null) {
-            return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ErrorResponse("Không tìm thấy nhân viên"))
-                    .build();
-        }
-
-        // THÊM: Kiểm tra độ khó mật khẩu khi Admin tạo/cập nhật cho nhân viên
-        if (req.password() == null || !req.password().matches(PASSWORD_REGEX)) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse(PASSWORD_ERROR_MSG))
-                    .build();
-        }
-
-        entity.username = req.username();
-        entity.setPassword(req.password()); // Hàm setPassword này trong model của Toản tự Bcrypt rồi đúng không?
-        entity.persistAndFlush();
-        return Response.ok(entity).build();
-    }
+   
 
     // DELETE /api/staff/{id}/account — xoá tài khoản
     @DELETE

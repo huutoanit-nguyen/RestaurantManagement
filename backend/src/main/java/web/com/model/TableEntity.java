@@ -2,7 +2,9 @@ package web.com.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
@@ -15,10 +17,15 @@ public class TableEntity extends PanacheEntityBase {
     public Long id;
 
     @Column(name = "table_number", nullable = false, unique = true)
+    @NotNull(message = "Số bàn không được để trống")
+    @Min(value = 1, message = "Số bàn phải là số nguyên dương lớn hơn hoặc bằng 1")
     public Integer tableNumber;
 
-    @Min(value = 1, message = "Sức chứa phải lớn hơn 0")
+
     @Column(name = "capacity", nullable = false)
+    @NotNull(message = "Sức chứa không được để trống")
+    @Min(value = 1, message = "Sức chứa phải là số nguyên dương từ 1 đến 50")
+    @Max(value = 50, message = "Sức chứa tối đa của một bàn là 50 người")
     public Integer capacity;
 
     @Column(name = "location")

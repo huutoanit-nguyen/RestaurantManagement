@@ -1,6 +1,6 @@
 
 INSERT INTO staff (id, fullName, role, shift, username, password) 
-VALUES (1, 'Nguyễn Hữu Toản', 'Quản lý', 'Ca sáng', 'admin', '$2a$12$mNQg.cfgi7KVgPeamIbPRujSuzD6.Ok85IbYsu./Kaeu9W5cItUiy');
+VALUES (2, 'Nguyễn Hữu Toản', 'Quản lý', 'Ca sáng', 'admin', '$2a$12$LfaYDJ5iKujXYCazU6EoJO84TLJlnOTNpwngFi9QpI7AzbN6U7otS');
 
 UPDATE staff_SEQ SET next_val = 2;
 

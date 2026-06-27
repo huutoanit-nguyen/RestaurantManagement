@@ -2,6 +2,7 @@ package web.com.controller;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -48,7 +49,7 @@ public class TableResource {
     // ==================== POST (CREATE) ====================
     @POST
     @Transactional
-    public Response create(TableEntity table) {
+    public Response create(@Valid TableEntity table) {
         if (table == null) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("{\"message\": \"Request body is required\"}")

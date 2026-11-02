@@ -1,13 +1,18 @@
 package web.com.controller;
 
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import web.com.exception.ErrorResponse;
+import web.com.model.MenuItem;
 import web.com.model.Order;
 import web.com.model.OrderItem;
+import web.com.model.TableEntity;
+import web.com.security.Roles;
+import web.com.security.TenantContext;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,31 +22,32 @@ import java.util.List;
 @Consumes(MediaType.APPLICATION_JSON)
 public class OrderResource {
 
+    @Inject TenantContext tenant;
+
     // ── Request records ───────────────────────────────────────────────────────
-    public record OrderItemRequest(Long menuItemId, String name, long price, int quantity) {}
+    public record OrderItemRequest(Long menuItemId, int quantity) {}
     public record CreateOrderRequest(Long tableId, List<OrderItemRequest> items) {}
     public record AddItemsRequest(List<OrderItemRequest> items) {}
 
     // GET /api/orders?tableId=1&status=PENDING
     @GET
-    @RolesAllowed({ "Quản lý", "Phục vụ", "Thu ngân", "Bếp" })
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU, Roles.THU_NGAN, Roles.BEP })
     public List<Order> getAll(
         @QueryParam("tableId") Long tableId,
         @QueryParam("status")  String status
     ) {
+        Long rid = tenant.restaurantId();
         if (tableId != null && status != null)
-            return Order.find("tableId = ?1 and status = ?2", tableId, status).list();
-        if (tableId != null)
-            return Order.find("tableId", tableId).list();
-        if (status != null)
-            return Order.find("status", status).list();
-        return Order.listAll();
+            return Order.find("restaurantId = ?1 and tableId = ?2 and status = ?3", rid, tableId, status).list();
+        if (tableId != null) return Order.find("restaurantId = ?1 and tableId = ?2", rid, tableId).list();
+        if (status != null)  return Order.find("restaurantId = ?1 and status = ?2", rid, status).list();
+        return Order.list("restaurantId", rid);
     }
 
     // GET /api/orders/{id}
     @GET
     @Path("/{id}")
-    @RolesAllowed({ "Quản lý", "Phục vụ", "Thu ngân", "Bếp" })
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU, Roles.THU_NGAN, Roles.BEP })
     public Order getById(@PathParam("id") Long id) {
         return findOrThrow(id);
     }
@@ -49,24 +55,46 @@ public class OrderResource {
     // POST /api/orders — tạo order mới khi khách bắt đầu gọi món
     @POST
     @Transactional
-    @RolesAllowed({ "Quản lý", "Phục vụ" })
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU })
     public Response create(CreateOrderRequest req) {
+        Long rid = tenant.restaurantId();
+
+        // 1. Bàn phải thuộc nhà hàng này
+        TableEntity table = TableEntity.findByIdAndRestaurant(req.tableId(), rid);
+        if (table == null) {
+            throw new WebApplicationException(
+                Response.status(400).entity(new ErrorResponse("Bàn không tồn tại")).build());
+        }
+
         Order order = new Order();
+        order.restaurantId = rid;            // 2. Từ token
         order.tableId = req.tableId();
         order.status  = "PENDING";
 
-        for (OrderItemRequest i : req.items()) {
-            OrderItem item  = new OrderItem();
-            item.order      = order;
-            item.menuItemId = i.menuItemId();
-            item.name       = i.name();
-            item.price      = i.price();
-            item.quantity   = i.quantity();
-            order.items.add(item);
+        if (req.items() != null) {
+            for (OrderItemRequest i : req.items()) {
+                if (i.quantity() <= 0) throw bad("Số lượng phải lớn hơn 0");
+
+                // 3. Lấy tên và GIÁ từ DB, không tin client
+                MenuItem m = MenuItem.find("id = ?1 and restaurantId = ?2", i.menuItemId(), rid).firstResult();
+                if (m == null) throw bad("Món không tồn tại: " + i.menuItemId());
+
+                OrderItem item = new OrderItem();
+                item.order = order;
+                item.menuItemId = m.id;
+                item.name = m.name;
+                item.price = m.price;
+                item.quantity = i.quantity();
+                order.items.add(item);
+            }
         }
 
         order.recalculateTotal();
         order.persist();
+
+        // Cập nhật trạng thái bàn sang OCCUPIED
+        table.status = "OCCUPIED";
+
         return Response.status(Response.Status.CREATED).entity(order).build();
     }
 
@@ -74,31 +102,40 @@ public class OrderResource {
     @POST
     @Path("/{id}/items")
     @Transactional
-    @RolesAllowed({ "Quản lý", "Phục vụ" })
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU })
     public Order addItems(@PathParam("id") Long id, AddItemsRequest req) {
+        Long rid = tenant.restaurantId();
         Order order = findOrThrow(id);
-        if ("PAID".equals(order.status))
+        if ("PAID".equals(order.status)) {
             throw new WebApplicationException(
                 Response.status(400).entity(new ErrorResponse("Order đã thanh toán")).build()
             );
+        }
 
-        for (OrderItemRequest i : req.items()) {
-            // Nếu món đã có thì tăng quantity
-            order.items.stream()
-                .filter(existing -> existing.menuItemId.equals(i.menuItemId()))
-                .findFirst()
-                .ifPresentOrElse(
-                    existing -> existing.quantity += i.quantity(),
-                    () -> {
-                        OrderItem item  = new OrderItem();
-                        item.order      = order;
-                        item.menuItemId = i.menuItemId();
-                        item.name       = i.name();
-                        item.price      = i.price();
-                        item.quantity   = i.quantity();
-                        order.items.add(item);
-                    }
-                );
+        if (req.items() != null) {
+            for (OrderItemRequest i : req.items()) {
+                if (i.quantity() <= 0) throw bad("Số lượng phải lớn hơn 0");
+
+                MenuItem m = MenuItem.find("id = ?1 and restaurantId = ?2", i.menuItemId(), rid).firstResult();
+                if (m == null) throw bad("Món không tồn tại: " + i.menuItemId());
+
+                // Nếu món đã có thì tăng quantity
+                order.items.stream()
+                    .filter(existing -> existing.menuItemId.equals(i.menuItemId()))
+                    .findFirst()
+                    .ifPresentOrElse(
+                        existing -> existing.quantity += i.quantity(),
+                        () -> {
+                            OrderItem item = new OrderItem();
+                            item.order      = order;
+                            item.menuItemId = m.id;
+                            item.name       = m.name;
+                            item.price      = m.price;
+                            item.quantity   = i.quantity();
+                            order.items.add(item);
+                        }
+                    );
+            }
         }
 
         order.recalculateTotal();
@@ -109,15 +146,23 @@ public class OrderResource {
     @PUT
     @Path("/{id}/pay")
     @Transactional
-    @RolesAllowed({ "Quản lý", "Thu ngân" })
+    @RolesAllowed({ Roles.QUAN_LY, Roles.THU_NGAN })
     public Order pay(@PathParam("id") Long id) {
         Order order = findOrThrow(id);
-        if ("PAID".equals(order.status))
+        if ("PAID".equals(order.status)) {
             throw new WebApplicationException(
                 Response.status(400).entity(new ErrorResponse("Order đã được thanh toán rồi")).build()
             );
+        }
         order.status = "PAID";
         order.paidAt = LocalDateTime.now();
+
+        // Đồng bộ bàn sang AVAILABLE
+        TableEntity table = TableEntity.findByIdAndRestaurant(order.tableId, order.restaurantId);
+        if (table != null) {
+            table.status = "AVAILABLE";
+        }
+
         return order;
     }
 
@@ -125,7 +170,7 @@ public class OrderResource {
     @DELETE
     @Path("/{id}")
     @Transactional
-    @RolesAllowed("Quản lý")
+    @RolesAllowed(Roles.QUAN_LY)
     public Response delete(@PathParam("id") Long id) {
         Order order = findOrThrow(id);
         order.delete();
@@ -134,10 +179,18 @@ public class OrderResource {
 
     // ── Helper ────────────────────────────────────────────────────────────────
     private Order findOrThrow(Long id) {
-        Order o = Order.findById(id);
-        if (o == null) throw new WebApplicationException(
-            Response.status(404).entity(new ErrorResponse("Không tìm thấy order id = " + id)).build()
-        );
+        Order o = Order.find("id = ?1 and restaurantId = ?2", id, tenant.restaurantId()).firstResult();
+        if (o == null) {
+            throw new WebApplicationException(
+                Response.status(404).entity(new ErrorResponse("Không tìm thấy order id = " + id)).build()
+            );
+        }
         return o;
+    }
+
+    private WebApplicationException bad(String message) {
+        return new WebApplicationException(
+            Response.status(Response.Status.BAD_REQUEST).entity(new ErrorResponse(message)).build()
+        );
     }
 }

@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 @Table(name = "password_change_log")
 public class PasswordChangeLog extends PanacheEntity {
 
+    @Column(name = "restaurant_id", nullable = false)
+    public Long restaurantId;
+
     @Column(name = "staff_id", nullable = false)
     public Long staffId;
 

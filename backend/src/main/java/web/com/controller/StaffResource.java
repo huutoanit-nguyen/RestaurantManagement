@@ -1,209 +1,189 @@
 package web.com.controller;
 
-import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.SecurityContext;
 import web.com.exception.ErrorResponse;
+import web.com.model.Account;
+import web.com.model.Membership;
 import web.com.model.PasswordChangeLog;
-import web.com.model.Staff;
+import web.com.security.Roles;
+import web.com.security.TenantContext;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
-import io.quarkus.elytron.security.common.BcryptUtil;
+import java.util.stream.Collectors;
 
 @Path("/api/staff")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class StaffResource {
 
-    // Regex check độ khó: Ít nhất 8 ký tự, có 1 chữ hoa, 1 chữ thường, 1 chữ số
     private static final String PASSWORD_REGEX = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,}$";
-    private static final String PASSWORD_ERROR_MSG = "Mật khẩu không đủ an toàn! (Phải từ 8 ký tự trở lên, bao gồm chữ hoa, chữ thường và số).";
+    private static final String PASSWORD_ERROR_MSG = "Mật khẩu phải từ 8 ký tự trở lên, bao gồm chữ hoa, chữ thường và số";
 
-    // GET /api/staff
+    @Inject TenantContext tenant;
+
+    // ── DTOs ─────────────────────────────────────────────────────────────────
+
+    public record StaffView(Long membershipId, Long accountId, String fullName,
+                            String phone, String role, String shift) {}
+
+    public record UpdateStaffRequest(String role, String shift) {}
+
+    public record ChangePasswordRequest(String oldPassword, String newPassword) {}
+
+    // ── GET /api/staff — Danh sách nhân viên (membership ACTIVE) của nhà hàng ──
+
     @GET
-    @PermitAll
-    public List<Staff> getAll(
-            @QueryParam("role") String role,
-            @QueryParam("shift") String shift,
-            @QueryParam("search") String search) {
-        if (role != null)
-            return Staff.list("role", role);
-        if (shift != null)
-            return Staff.list("shift", shift);
-        if (search != null)
-            return Staff.find("lower(name) like ?1",
-                    "%" + search.toLowerCase() + "%").list();
-        return Staff.listAll();
+    @RolesAllowed(Roles.QUAN_LY)
+    public List<StaffView> getAll() {
+        Long rid = tenant.restaurantId();
+        List<Membership> members = Membership.listActiveByRestaurant(rid);
+        return members.stream().map(this::toView).collect(Collectors.toList());
     }
 
-    // GET /api/staff/{id}
-    @GET
-    @Path("/{id}")
-    public Staff getById(@PathParam("id") Long id) {
-        return findOrThrow(id);
-    }
+    // ── PUT /api/staff/{membershipId} — Đổi role/ca ──────────────────────────
 
-    // POST /api/staff — tạo staff không có tài khoản (username/password để null)
-@POST
-@Transactional
-@RolesAllowed("Quản lý")
-public Response create(@Valid Staff staff) {
-    staff.id = null;
-    staff.username = null; // ✅ Tạo nhân viên trước, cấp tài khoản sau qua /account
-    staff.password = null;
-    staff.persist();
-    return Response.status(Response.Status.CREATED).entity(staff).build();
-}
-
-// PUT /api/staff/{id}/account — cấp/đổi tài khoản
-@PUT
-@Path("/{id}/account")
-@Transactional
-@RolesAllowed("Quản lý")
-public Response setAccount(@PathParam("id") Long id, AccountRequest req) {
-    Staff entity = Staff.findById(id);
-    if (entity == null) {
-        return Response.status(Response.Status.NOT_FOUND)
-                .entity(new ErrorResponse("Không tìm thấy nhân viên"))
-                .build();
-    }
-
-    if (req.password() == null || !req.password().matches(PASSWORD_REGEX)) {
-        return Response.status(Response.Status.BAD_REQUEST)
-                .entity(new ErrorResponse(PASSWORD_ERROR_MSG))
-                .build();
-    }
-
-    entity.username = req.username();
-    entity.hashPassword(req.password()); // ✅ Hash đúng 1 lần duy nhất
-    entity.persistAndFlush();
-    return Response.ok(entity).build();
-}
-
-    // PUT /api/staff/{id}
     @PUT
-    @Path("/{id}")
+    @Path("/{membershipId}")
     @Transactional
-    public Staff update(@PathParam("id") Long id, @Valid Staff body) {
-        Staff entity = findOrThrow(id);
-        entity.fullName = body.fullName;
-        entity.role = body.role;
-        entity.shift = body.shift;
-        return entity;
+    @RolesAllowed(Roles.QUAN_LY)
+    public Response update(@PathParam("membershipId") Long mid, UpdateStaffRequest req) {
+        Long rid = tenant.restaurantId();
+        Membership actor = currentMember();
+        if (actor == null) return forbidden("Không xác định được quyền của bạn trong nhà hàng này");
+
+        Membership target = Membership.find("id = ?1 and restaurantId = ?2 and status = ?3",
+                mid, rid, Membership.ACTIVE).firstResult();
+        if (target == null) return notFound();
+
+        // Quản lý không được sửa Quản lý khác hay Chủ; không ai sửa được Chủ
+        if (!Roles.canManage(actor.role, target.role)) {
+            return forbidden("Bạn không có quyền sửa người này");
+        }
+
+        // Quản lý không được bổ nhiệm Quản lý; chỉ Chủ mới được
+        if (req.role() != null && !Roles.canAssign(actor.role, req.role())) {
+            return forbidden("Bạn không có quyền gán vai trò này");
+        }
+
+        if (req.role() != null)  target.role = req.role();
+        if (req.shift() != null) target.shift = req.shift();
+
+        return Response.ok(toView(target)).build();
     }
 
-    // DELETE /api/staff/{id}
+    // ── DELETE /api/staff/{membershipId} — Cho nghỉ (xóa membership) ─────────
+
     @DELETE
-    @Path("/{id}")
+    @Path("/{membershipId}")
     @Transactional
-    @RolesAllowed("Quản lý")
-    public Response delete(@PathParam("id") Long id) {
-        boolean deleted = Staff.deleteById(id);
-        if (!deleted)
-            throw notFound(id);
+    @RolesAllowed(Roles.QUAN_LY)
+    public Response delete(@PathParam("membershipId") Long mid) {
+        Long rid = tenant.restaurantId();
+        Membership actor = currentMember();
+        if (actor == null) return forbidden("Không xác định được quyền của bạn trong nhà hàng này");
+
+        Membership target = Membership.find("id = ?1 and restaurantId = ?2 and status = ?3",
+                mid, rid, Membership.ACTIVE).firstResult();
+        if (target == null) return notFound();
+
+        if (!Roles.canManage(actor.role, target.role)) {
+            return forbidden("Bạn không có quyền cho người này nghỉ");
+        }
+
+        target.delete();
         return Response.noContent().build();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-    private Staff findOrThrow(Long id) {
-        Staff s = Staff.findById(id);
-        if (s == null)
-            throw notFound(id);
-        return s;
-    }
+    // ── GET /api/staff/me — Thông tin bản thân ───────────────────────────────
 
-    private WebApplicationException notFound(Long id) {
-        return new WebApplicationException(
-                Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ErrorResponse("Không tìm thấy nhân viên với id = " + id))
-                        .build());
-    }
-
-   
-
-    // DELETE /api/staff/{id}/account — xoá tài khoản
-    @DELETE
-    @Path("/{id}/account")
-    @Transactional
-    @RolesAllowed("Quản lý")
-    public Response removeAccount(@PathParam("id") Long id) {
-        Staff entity = findOrThrow(id);
-        entity.username = null;
-        entity.password = null;
-        return Response.noContent().build();
-    }
-
-    public record AccountRequest(String username, String password) {
-    }
-
-    // GET /api/staff/me — lấy thông tin bản thân
     @GET
     @Path("/me")
-    @RolesAllowed({ "Quản lý", "Phục vụ", "Thu ngân", "Bếp", "Bảo vệ" })
-    public Staff getMe(@Context SecurityContext ctx) {
-        String username = ctx.getUserPrincipal().getName();
-        Staff staff = Staff.find("username", username).firstResult();
-        if (staff == null)
-            throw notFound(-1L);
-        return staff;
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU, Roles.THU_NGAN, Roles.BEP })
+    public Response getMe() {
+        Long accountId = tenant.accountId();
+        Account acc = Account.findById(accountId);
+        if (acc == null) return Response.status(404).entity(new ErrorResponse("Không tìm thấy tài khoản")).build();
+
+        Membership m = currentMember();
+        if (m == null) return Response.status(404).entity(new ErrorResponse("Không tìm thấy thông tin làm việc")).build();
+
+        return Response.ok(toView(m)).build();
     }
 
-    // PUT /api/staff/me/password — Bản thân tự đổi mật khẩu
+    // ── PUT /api/staff/me/password — Tự đổi mật khẩu ─────────────────────────
+
     @PUT
     @Path("/me/password")
     @Transactional
-    @RolesAllowed({ "Quản lý", "Phục vụ", "Thu ngân", "Bếp", "Bảo vệ" })
-    public Response changeMyPassword(
-            @Context SecurityContext ctx,
-            ChangePasswordRequest req) {
-        String username = ctx.getUserPrincipal().getName();
-        Staff staff = Staff.find("username", username).firstResult();
-        if (staff == null)
-            throw notFound(-1L);
-
-        // 1. Kiểm tra mật khẩu cũ
-        if (!BcryptUtil.matches(req.oldPassword(), staff.password)) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("Mật khẩu cũ không đúng"))
-                    .build();
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU, Roles.THU_NGAN, Roles.BEP })
+    public Response changePassword(ChangePasswordRequest req) {
+        if (req == null || req.oldPassword() == null || req.newPassword() == null) {
+            return Response.status(400).entity(new ErrorResponse("Thiếu thông tin mật khẩu")).build();
         }
 
-        // 2. THÊM: Kiểm tra mật khẩu mới theo chuẩn độ khó (Chữ hoa, chữ thường, số, >= 8 ký tự)
-        if (req.newPassword() == null || !req.newPassword().matches(PASSWORD_REGEX)) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse(PASSWORD_ERROR_MSG))
-                    .build();
+        Long accountId = tenant.accountId();
+        Account acc = Account.findById(accountId);
+        if (acc == null) return Response.status(404).entity(new ErrorResponse("Không tìm thấy tài khoản")).build();
+
+        if (!acc.checkPassword(req.oldPassword())) {
+            return Response.status(400).entity(new ErrorResponse("Mật khẩu cũ không đúng")).build();
         }
 
-        // Mã hóa mật khẩu mới và lưu
-        staff.password = BcryptUtil.bcryptHash(req.newPassword(), 12);
-        staff.persistAndFlush();
+        if (!req.newPassword().matches(PASSWORD_REGEX)) {
+            return Response.status(400).entity(new ErrorResponse(PASSWORD_ERROR_MSG)).build();
+        }
 
-        // Ghi log để admin xem
+        acc.hashPassword(req.newPassword());
+
         PasswordChangeLog log = new PasswordChangeLog();
-        log.staffId = staff.id;
-        log.staffName = staff.fullName;
-        log.changedAt = LocalDateTime.now();
+        log.restaurantId = tenant.restaurantId();
+        log.staffId      = acc.id;
+        log.staffName    = acc.fullName;
+        log.changedAt    = LocalDateTime.now();
         log.persist();
 
         return Response.ok().build();
     }
 
-    public record ChangePasswordRequest(String oldPassword, String newPassword) {
-    }
+    // ── GET /api/staff/password-logs — Log đổi mật khẩu của nhà hàng ──────────
 
     @GET
     @Path("/password-logs")
-    @RolesAllowed("Quản lý")
+    @RolesAllowed(Roles.QUAN_LY)
     public List<PasswordChangeLog> getPasswordLogs() {
-        return PasswordChangeLog.find("ORDER BY changedAt DESC").list();
+        return PasswordChangeLog.find("restaurantId = ?1 order by changedAt desc",
+                tenant.restaurantId()).list();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private Membership currentMember() {
+        return Membership.findActive(tenant.accountId(), tenant.restaurantId());
+    }
+
+    private StaffView toView(Membership m) {
+        Account acc = Account.findById(m.accountId);
+        return new StaffView(
+            m.id,
+            m.accountId,
+            acc != null ? acc.fullName : "?",
+            acc != null ? acc.phone : "?",
+            m.role,
+            m.shift
+        );
+    }
+
+    private Response notFound() {
+        return Response.status(404).entity(new ErrorResponse("Không tìm thấy nhân viên")).build();
+    }
+
+    private Response forbidden(String msg) {
+        return Response.status(403).entity(new ErrorResponse(msg)).build();
     }
 }

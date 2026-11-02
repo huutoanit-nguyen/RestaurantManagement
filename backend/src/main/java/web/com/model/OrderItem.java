@@ -8,10 +8,6 @@ import jakarta.persistence.*;
 @Table(name = "order_items")
 public class OrderItem extends PanacheEntity {
 
-    @GeneratedValue(strategy = GenerationType.TABLE, generator = "order_items_seq_gen")
-    @TableGenerator(name = "order_items_seq_gen", table = "orders_SEQ2", valueColumnName = "next_val", allocationSize = 1)
-    public Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     @JsonIgnore
@@ -21,10 +17,10 @@ public class OrderItem extends PanacheEntity {
     public Long menuItemId;
 
     @Column(nullable = false, length = 255)
-    public String name; // snapshot
+    public String name;
 
     @Column(nullable = false)
-    public long price; // snapshot
+    public long price;
 
     @Column(nullable = false)
     public int quantity;

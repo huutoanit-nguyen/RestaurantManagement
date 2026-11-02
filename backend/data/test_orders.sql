@@ -2,13 +2,13 @@
 DELETE FROM order_items;
 DELETE FROM orders;
 
--- Dùng đúng tên cột restaurantTable_id
-INSERT INTO orders (id, restaurantTable_id, status, totalPrice, created_at, paid_at) VALUES
-(1, 1, 'PAID',    620000, NOW() - INTERVAL 3 HOUR, NOW() - INTERVAL 2 HOUR),
-(2, 2, 'PAID',    440000, NOW() - INTERVAL 5 HOUR, NOW() - INTERVAL 4 HOUR),
-(3, 3, 'PAID',    930000, NOW() - INTERVAL 6 HOUR, NOW() - INTERVAL 5 HOUR),
-(4, 1, 'PENDING', 480000, NOW() - INTERVAL 1 HOUR, NULL),
-(5, 4, 'PAID',    545000, NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 1 HOUR);
+-- Dùng đúng tên cột restaurantTable_id và restaurant_id
+INSERT INTO orders (id, restaurant_id, restaurantTable_id, status, totalPrice, created_at, paid_at) VALUES
+(1, 1, 1, 'PAID',    620000, NOW() - INTERVAL 3 HOUR, NOW() - INTERVAL 2 HOUR),
+(2, 1, 2, 'PAID',    440000, NOW() - INTERVAL 5 HOUR, NOW() - INTERVAL 4 HOUR),
+(3, 1, 3, 'PAID',    930000, NOW() - INTERVAL 6 HOUR, NOW() - INTERVAL 5 HOUR),
+(4, 1, 1, 'PENDING', 480000, NOW() - INTERVAL 1 HOUR, NULL),
+(5, 1, 4, 'PAID',    545000, NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 1 HOUR);
 
 INSERT INTO order_items (id, order_id, menu_item_id, name, price, quantity) VALUES
 (1,  1, 4,  'Bò Bít Tết (Wagyu)',            450000, 1),

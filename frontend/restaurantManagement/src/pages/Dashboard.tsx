@@ -153,8 +153,6 @@ const Dashboard: React.FC = () => {
           body: JSON.stringify({
             items: pendingCart.map(i => ({
               menuItemId: i.id,
-              name:       i.name,
-              price:      i.price,
               quantity:   i.quantity,
             })),
           }),
@@ -167,8 +165,6 @@ const Dashboard: React.FC = () => {
             tableId: selectedTable.id,
             items: pendingCart.map(i => ({
               menuItemId: i.id,
-              name:       i.name,
-              price:      i.price,
               quantity:   i.quantity,
             })),
           }),

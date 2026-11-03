@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import type { JSX } from "react/jsx-dev-runtime";
+import { session } from "@/api/auth";
 
 interface AuthGuardProps {
   children: JSX.Element;
@@ -8,31 +9,29 @@ interface AuthGuardProps {
 
 const AuthGuard = ({ children, requiredRole }: AuthGuardProps) => {
   const location = useLocation();
-  
-  // 1. Lấy token và thông tin user từ localStorage
-  const token = localStorage.getItem("token");
-  const userJson = localStorage.getItem("user");
-  const user = userJson ? JSON.parse(userJson) : null;
 
-  // 2. Nếu chưa đăng nhập -> Đá về trang /login
-  // state={{ from: location }} giúp sau khi login xong có thể quay lại trang cũ
+  // 1. Lấy token từ session
+  const token = session.token;
+  const currentRole = session.role;
+
+  // 2. Nếu chưa đăng nhập → Đá về trang /login
   if (!token) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. Nếu có yêu cầu Role mà User không đủ quyền -> Hiện thông báo
-  if (requiredRole && user?.role !== requiredRole) {
-    console.warn(`Truy cập bị chặn: Yêu cầu ${requiredRole} nhưng bạn là ${user?.role}`);
+  // 3. Nếu có yêu cầu Role mà User không đủ quyền → Hiện thông báo
+  if (requiredRole && currentRole !== requiredRole) {
+    console.warn(`Truy cập bị chặn: Yêu cầu ${requiredRole} nhưng bạn là ${currentRole}`);
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[50vh]">
         <h2 className="text-xl font-semibold text-red-500 mb-4">
-          Nếu là quản lý thì hãy đăng nhập!
+          Bạn không có quyền truy cập tính năng này!
         </h2>
       </div>
     );
   }
 
-  // 4. Mọi thứ ok? Cho đi tiếp vào trang con
+  // 4. Mọi thứ ok → Cho đi tiếp
   return children;
 };
 

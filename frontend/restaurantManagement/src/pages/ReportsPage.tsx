@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Loader2, TrendingUp, ShoppingBag, DollarSign, UtensilsCrossed } from 'lucide-react';
+import { ShieldAlert, Loader2 } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -11,11 +11,18 @@ import {
   LineChart,
   Line,
 } from 'recharts';
+import { session, api } from '../api/auth';
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 function canViewReports(): boolean {
-  const role = (localStorage.getItem('userRole') ?? '').trim().toLowerCase();
-  return role === 'quản lý' || role === 'admin';
+  const role = (session.role || localStorage.getItem('userRole') || '').trim().toLowerCase();
+  return (
+    role === 'chủ cửa hàng' ||
+    role === 'chu_cua_hang' ||
+    role === 'quản lý' ||
+    role === 'quan_ly' ||
+    role === 'admin'
+  );
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -31,44 +38,27 @@ interface DailyRevenue {
   revenue: number;
 }
 
-// ─── Mock API (thay bằng fetch thật khi có backend) ───────────────────────────
-// Thay 2 hàm fetch mock bằng:
-async function fetchSummary(): Promise<ReportSummary> {
-  const token = localStorage.getItem('token');
-  const res = await fetch('/api/reports/summary', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Lỗi tải summary');
-  return res.json();
+// ─── API ──────────────────────────────────────────────────────────────────────
+function fetchSummary(): Promise<ReportSummary> {
+  return api<ReportSummary>('/api/reports/summary');
 }
 
-async function fetchWeeklyRevenue(): Promise<DailyRevenue[]> {
-  const token = localStorage.getItem('token');
-  const res = await fetch('/api/reports/weekly', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Lỗi tải weekly');
-  return res.json();
+function fetchWeeklyRevenue(): Promise<DailyRevenue[]> {
+  return api<DailyRevenue[]>('/api/reports/weekly');
 }
 
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 interface StatCardProps {
-  icon: React.ReactNode;
-  iconBg: string;
   label: string;
   value: string;
+  colorClass?: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ icon, iconBg, label, value }) => (
-  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-4">
-    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBg}`}>
-      {icon}
-    </div>
-    <div>
-      <p className="text-sm text-gray-400">{label}</p>
-      <p className="text-2xl font-bold text-gray-800 mt-0.5">{value}</p>
-    </div>
+const StatCard: React.FC<StatCardProps> = ({ label, value, colorClass = 'text-gray-900' }) => (
+  <div className="bg-[#FAF7F2] rounded-2xl border border-[#8C6F56]/15 p-5 flex flex-col justify-between">
+    <p className="text-sm font-semibold text-gray-500 mb-2">{label}</p>
+    <p className={`text-2xl font-bold tracking-tight ${colorClass}`}>{value}</p>
   </div>
 );
 
@@ -144,31 +134,25 @@ const ReportsPage: React.FC = () => {
 
       {!loading && !error && summary && (
         <>
-          {/* ── Stat cards ── */}
+          {/* ── Stat cards (không có icon) ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard
-              iconBg="bg-[#E6F7F4]"
-              icon={<DollarSign size={22} className="text-teal-500" />}
               label="Doanh thu hôm nay"
               value={`${summary.revenueToday.toLocaleString('vi-VN')}đ`}
+              colorClass="text-[#8C6F56]"
             />
             <StatCard
-              iconBg="bg-[#FEF3E6]"
-              icon={<ShoppingBag size={22} className="text-amber-500" />}
               label="Số đơn hàng"
               value={String(summary.totalOrders)}
             />
             <StatCard
-              iconBg="bg-[#F3EFFC]"
-              icon={<UtensilsCrossed size={22} className="text-purple-400" />}
               label="Món đã bán"
               value={String(summary.totalDishes)}
             />
             <StatCard
-              iconBg="bg-[#E6F7F4]"
-              icon={<TrendingUp size={22} className="text-teal-500" />}
               label="Tăng trưởng"
-              value={`+${summary.growthPercent}%`}
+              value={`${summary.growthPercent >= 0 ? '+' : ''}${summary.growthPercent}%`}
+              colorClass={summary.growthPercent >= 0 ? 'text-emerald-600' : 'text-red-500'}
             />
           </div>
 

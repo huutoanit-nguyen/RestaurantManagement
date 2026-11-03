@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Pencil, Trash2, Plus, X, Loader2, Search } from 'lucide-react';
+import { session } from '../api/auth';
 
 type Category = 'Món chính' | 'Khai vị' | 'Đồ uống' | 'Tráng miệng';
 
@@ -20,10 +21,19 @@ const BASE_URL = '/api/menu-items';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = session.token;
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
+  if (res.status === 401) {
+    session.clear();
+    window.location.href = '/login';
+    throw new Error('Hết phiên');
+  }
   if (!res.ok) {
     const err: ApiError = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || `HTTP ${res.status}`);

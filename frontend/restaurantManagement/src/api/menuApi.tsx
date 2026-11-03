@@ -1,4 +1,6 @@
-const BASE_URL = import.meta.env.VITE_API_URL;
+import { session } from './auth';
+
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type MenuCategory = 'Món chính' | 'Khai vị' | 'Đồ uống' | 'Tráng miệng';
@@ -24,8 +26,13 @@ export interface UpdateMenuItemRequest {
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = session.token;
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
     ...options,
   });
 

@@ -1,331 +1,428 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, X, Loader2, Users } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Search, Trash2, X, Loader2, Users, Edit2,
+  UserCheck, UserX, Clock, ChevronDown,
+} from 'lucide-react';
+import { api, session } from '../api/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Role  = 'Quản lý' | 'Phục vụ' | 'Thu ngân' | 'Bếp' | 'Bảo vệ';
+type Role = 'Quản lý' | 'Phục vụ' | 'Thu ngân' | 'Bếp';
 type Shift = 'Ca sáng' | 'Ca chiều' | 'Ca tối';
+type JoinStatus = 'PENDING' | 'ACTIVE' | 'REJECTED';
 
-interface Staff {
-  id: number;
+interface StaffView {
+  membershipId: number;
+  accountId: number;
   fullName: string;
+  phone: string;
   role: Role;
   shift: Shift;
 }
 
+interface JoinRequest {
+  id: number;
+  accountId: number;
+  fullName: string;
+  phone: string;
+  status: JoinStatus;
+  requestedAt?: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ROLES:  Role[]  = ['Quản lý', 'Phục vụ', 'Thu ngân', 'Bếp', 'Bảo vệ'];
+const ROLES: Role[] = ['Quản lý', 'Phục vụ', 'Thu ngân', 'Bếp'];
 const SHIFTS: Shift[] = ['Ca sáng', 'Ca chiều', 'Ca tối'];
-const EMPTY_FORM = { fullName: '', role: '' as Role | '', shift: '' as Shift | '' };
-const BASE_URL = '/api/staff';
 
-// ─── Lấy role từ localStorage (do LoginPage đã lưu sau khi đăng nhập) ────────
-function getCurrentRole(): string | null {
-  // Ưu tiên đọc từ localStorage.userRole (LoginPage lưu sẵn)
-  const roleFromStorage = localStorage.getItem('userRole');
-  if (roleFromStorage) return roleFromStorage;
-
-  // Fallback: đọc từ JWT token nếu không có userRole
-  const token = localStorage.getItem('token');
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    // Quarkus JWT lưu role trong groups (array) hoặc upn
-    const groups: string[] = payload.groups || [];
-    return groups[0] ?? payload.upn ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function isManagerRole(): boolean {
-  const role = getCurrentRole();
-  if (!role) return false;
-  // Normalize để tránh lỗi encoding tiếng Việt
-  return role.trim().toLowerCase() === 'quản lý'
-      || role.trim() === 'Quản lý'
-      || role.trim() === 'QUAN_LY'; // phòng khi backend dùng enum
-}
-
-// ─── API helpers ──────────────────────────────────────────────────────────────
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-    ...options,
-  });
-
-  if (res.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userName');
-    window.location.href = '/login';
-    throw new Error('Phiên đăng nhập hết hạn');
-  }
-
-  if (res.status === 403) {
-    throw new Error('Bạn không có quyền thực hiện thao tác này');
-  }
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `HTTP ${res.status}`);
-  }
-
-  return res.status === 204 ? (undefined as T) : res.json();
-}
-
-const api = {
-  getAll:  ()                           => apiFetch<Staff[]>(''),
-  create:  (body: Omit<Staff, 'id'>)  => apiFetch<Staff>('', { method: 'POST', body: JSON.stringify(body) }),
-  remove:  (id: number)                => apiFetch<void>(`/${id}`, { method: 'DELETE' }),
+const ROLE_BADGE: Record<string, string> = {
+  'Quản lý': 'bg-amber-100 text-amber-700',
+  'Phục vụ': 'bg-blue-100 text-blue-600',
+  'Thu ngân': 'bg-green-100 text-green-700',
+  'Bếp': 'bg-orange-100 text-orange-600',
+  'Chủ cửa hàng': 'bg-rose-100 text-rose-700',
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getMyRole(): string {
+  return session.role ?? '';
+}
+
+function canManage(): boolean {
+  const r = getMyRole().trim();
+  return ['Chủ cửa hàng', 'Quản lý', 'CHU_CUA_HANG', 'QUAN_LY'].includes(r);
+}
+
+// Kiểm tra xem mình có thể gán role đó không
+// Chủ: gán được tất cả. Quản lý: không gán được Quản lý.
+function canAssignRole(targetRole: string): boolean {
+  const myRole = getMyRole().trim();
+  const isChu = myRole === 'Chủ cửa hàng' || myRole === 'CHU_CUA_HANG';
+  if (isChu) return true;
+  // Quản lý không gán Quản lý hoặc Chủ
+  return !['Quản lý', 'QUAN_LY', 'Chủ cửa hàng', 'CHU_CUA_HANG'].includes(targetRole);
+}
+
+function assignableRoles(): Role[] {
+  return ROLES.filter(r => canAssignRole(r));
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const StaffPage: React.FC = () => {
-  const [staff, setStaff]               = useState<Staff[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [fetchError, setFetchError]     = useState<string | null>(null);
-  const [search, setSearch]             = useState('');
-  const [showModal, setShowModal]       = useState(false);
-  const [form, setForm]                 = useState(EMPTY_FORM);
-  const [formError, setFormError]       = useState<string | null>(null);
-  const [saving, setSaving]             = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Staff | null>(null);
-  const [deleting, setDeleting]         = useState(false);
+  const [staff, setStaff] = useState<StaffView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
-  // Tính 1 lần khi component mount, không thay đổi trong session
-  const isManager = isManagerRole();
+  // Edit modal
+  const [editTarget, setEditTarget] = useState<StaffView | null>(null);
+  const [editRole, setEditRole] = useState<Role>('Phục vụ');
+  const [editShift, setEditShift] = useState<Shift>('Ca sáng');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
-  const loadStaff = async () => {
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<StaffView | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Join requests panel
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [jrLoading, setJrLoading] = useState(false);
+
+  // Approve modal
+  const [approveTarget, setApproveTarget] = useState<JoinRequest | null>(null);
+  const [approveRole, setApproveRole] = useState<Role>('Phục vụ');
+  const [approveShift, setApproveShift] = useState<Shift>('Ca sáng');
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [approveSaving, setApproveSaving] = useState(false);
+
+  const isManager = canManage();
+
+  // ── Load staff ──────────────────────────────────────────────────────────────
+  const loadStaff = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const data = await api.getAll();
+      const data = await api<StaffView[]>('/api/staff');
       setStaff(data);
     } catch (e: any) {
-      setFetchError(e.message ?? 'Không tải được dữ liệu');
+      setFetchError(e.message ?? 'Không tải được danh sách nhân viên');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadStaff(); }, []);
-
-  const filtered = staff.filter(s =>
-    (s.fullName ?? '').toLowerCase().includes(search.toLowerCase())
-  );
-
-  // ── Add ──
-  const openAdd = () => {
-    setForm(EMPTY_FORM);
-    setFormError(null);
-    setShowModal(true);
-  };
-
-  const handleSave = async () => {
-    if (!form.fullName.trim()) { setFormError('Vui lòng nhập tên nhân viên'); return; }
-    if (!form.role)            { setFormError('Vui lòng chọn vai trò'); return; }
-    if (!form.shift)           { setFormError('Vui lòng chọn ca làm việc'); return; }
-
-    setSaving(true);
-    setFormError(null);
+  // ── Load join requests ──────────────────────────────────────────────────────
+  const loadJoinRequests = useCallback(async () => {
+    if (!isManager) return;
+    setJrLoading(true);
     try {
-      const created = await api.create({
-        fullName: form.fullName.trim(),
-        role:     form.role  as Role,
-        shift:    form.shift as Shift,
-      });
-      setStaff(prev => [...prev, created]);
-      setShowModal(false);
-    } catch (e: any) {
-      setFormError(e.message ?? 'Thêm thất bại, thử lại');
+      const data = await api<JoinRequest[]>('/api/restaurants/me/join-requests');
+      setJoinRequests(data.filter(r => r.status === 'PENDING'));
+    } catch {
+
     } finally {
-      setSaving(false);
+      setJrLoading(false);
+    }
+  }, [isManager]);
+
+  useEffect(() => {
+    loadStaff();
+    loadJoinRequests();
+  }, [loadStaff, loadJoinRequests]);
+
+  // ── Edit (thay đổi role / shift) ────────────────────────────────────────────
+  const openEdit = (s: StaffView) => {
+    setEditTarget(s);
+    setEditRole(s.role);
+    setEditShift(s.shift);
+    setEditError(null);
+  };
+
+  const handleEdit = async () => {
+    if (!editTarget) return;
+    if (!editRole) { setEditError('Vui lòng chọn vai trò'); return; }
+    if (!editShift) { setEditError('Vui lòng chọn ca làm việc'); return; }
+    if (!canAssignRole(editRole)) {
+      setEditError('Bạn không có quyền gán vai trò này');
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await api(`/api/staff/${editTarget.membershipId}`, {
+        method: 'PUT',
+        body: { role: editRole, shift: editShift },
+      });
+      setStaff(prev =>
+        prev.map(s =>
+          s.membershipId === editTarget.membershipId
+            ? { ...s, role: editRole, shift: editShift }
+            : s
+        )
+      );
+      setEditTarget(null);
+    } catch (e: any) {
+      setEditError(e.message ?? 'Cập nhật thất bại');
+    } finally {
+      setEditSaving(false);
     }
   };
 
-  // ── Delete ──
+  // ── Delete ──────────────────────────────────────────────────────────────────
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api.remove(deleteTarget.id);
-      setStaff(prev => prev.filter(s => s.id !== deleteTarget.id));
+      await api(`/api/staff/${deleteTarget.membershipId}`, { method: 'DELETE' });
+      setStaff(prev => prev.filter(s => s.membershipId !== deleteTarget.membershipId));
       setDeleteTarget(null);
     } catch (e: any) {
+      // Hiện lỗi qua alert đơn giản
       alert(e.message ?? 'Xoá thất bại');
     } finally {
       setDeleting(false);
     }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-  return (
-    <div className="flex-1 p-4 md:p-8 font-[ui-sans-serif,system-ui,sans-serif] h-full bg-white border-l border-gray-200 overflow-y-auto">
+  // ── Approve join request ────────────────────────────────────────────────────
+  const openApprove = (jr: JoinRequest) => {
+    setApproveTarget(jr);
+    setApproveRole('Phục vụ');
+    setApproveShift('Ca sáng');
+    setApproveError(null);
+  };
 
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Quản lý nhân viên</h2>
-          <p className="text-gray-400 text-sm mt-1">Danh sách nhân viên nhà hàng</p>
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    if (!approveRole) { setApproveError('Vui lòng chọn vai trò'); return; }
+    if (!approveShift) { setApproveError('Vui lòng chọn ca'); return; }
+    if (!canAssignRole(approveRole)) {
+      setApproveError('Bạn không có quyền gán vai trò này');
+      return;
+    }
+    setApproveSaving(true);
+    setApproveError(null);
+    try {
+      await api(`/api/restaurants/me/join-requests/${approveTarget.id}/approve`, {
+        method: 'PUT',
+        body: { role: approveRole, shift: approveShift },
+      });
+      setJoinRequests(prev => prev.filter(r => r.id !== approveTarget.id));
+      setApproveTarget(null);
+      loadStaff(); // reload để thấy nhân viên mới
+    } catch (e: any) {
+      setApproveError(e.message ?? 'Duyệt thất bại');
+    } finally {
+      setApproveSaving(false);
+    }
+  };
+
+  const handleReject = async (jr: JoinRequest) => {
+    try {
+      await api(`/api/restaurants/me/join-requests/${jr.id}/reject`, { method: 'PUT' });
+      setJoinRequests(prev => prev.filter(r => r.id !== jr.id));
+    } catch (e: any) {
+      alert(e.message ?? 'Từ chối thất bại');
+    }
+  };
+
+  // ── Filter ─────────────────────────────────────────────────────────────────
+  const filtered = staff.filter(s =>
+    s.fullName.toLowerCase().includes(search.toLowerCase()) ||
+    s.phone.includes(search) ||
+    s.role.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div className="flex-1 overflow-y-auto bg-[#FAF7F2] p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Users size={22} className="text-[#8C6F56]" />
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Nhân viên</h1>
+              <p className="text-xs text-gray-400">{staff.length} thành viên</p>
+            </div>
+          </div>
         </div>
-        {/* Chỉ quản lý mới thấy nút thêm */}
-        {isManager && (
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-[#8C6F56] text-white rounded-xl text-sm font-medium hover:bg-[#735a44] transition-all shadow-sm"
-          >
-            <Plus size={15} />
-            Thêm nhân viên
-          </button>
+
+        {/* ── Join requests (chỉ quản lý thấy) ── */}
+        {isManager && (joinRequests.length > 0 || jrLoading) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
+              <Clock size={14} />
+              Yêu cầu tham gia ({joinRequests.length})
+            </p>
+            {jrLoading ? (
+              <div className="flex justify-center py-2">
+                <Loader2 size={18} className="animate-spin text-amber-500" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {joinRequests.map(jr => (
+                  <div key={jr.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{jr.fullName}</p>
+                      <p className="text-xs text-gray-400">{jr.phone}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openApprove(jr)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#8C6F56] text-white text-xs font-medium hover:bg-[#735a44] transition"
+                      >
+                        <UserCheck size={13} /> Duyệt
+                      </button>
+                      <button
+                        onClick={() => handleReject(jr)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition"
+                      >
+                        <UserX size={13} /> Từ chối
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Search ── */}
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Tìm theo tên, SĐT hoặc vai trò..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8C6F56] transition"
+          />
+        </div>
+
+        {/* ── List ── */}
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 size={28} className="animate-spin text-[#8C6F56]" />
+          </div>
+        ) : fetchError ? (
+          <div className="bg-red-50 text-red-600 rounded-xl px-4 py-3 text-sm">{fetchError}</div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+            <Users size={36} className="opacity-30" />
+            <p className="text-sm">{search ? 'Không tìm thấy nhân viên phù hợp' : 'Chưa có nhân viên nào'}</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {filtered.map((s, idx) => (
+              <div
+                key={s.membershipId}
+                className={`flex items-center justify-between px-5 py-4 ${idx < filtered.length - 1 ? 'border-b border-gray-50' : ''
+                  }`}
+              >
+                {/* Avatar + info */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-[#8C6F56]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[#8C6F56] font-bold text-sm">
+                      {s.fullName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{s.fullName}</p>
+                    <p className="text-xs text-gray-400">{s.phone} · {s.shift}</p>
+                  </div>
+                </div>
+
+                {/* Badge + actions */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className={`hidden sm:inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${ROLE_BADGE[s.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {s.role}
+                  </span>
+                  {isManager && (
+                    <>
+                      <button
+                        onClick={() => openEdit(s)}
+                        className="p-2 rounded-lg hover:bg-[#FAF7F2] text-gray-400 hover:text-[#8C6F56] transition"
+                        title="Sửa vai trò / ca"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(s)}
+                        className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition"
+                        title="Xoá khỏi nhà hàng"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Search */}
-      <div className="relative mb-5 max-w-xs">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Tìm kiếm nhân viên..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 bg-[#FAF7F2] text-sm focus:outline-none focus:ring-1 focus:ring-[#8C6F56] focus:bg-white transition"
-        />
-      </div>
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center gap-2 text-gray-400 text-sm py-10 justify-center">
-          <Loader2 size={16} className="animate-spin" /> Đang tải danh sách nhân viên...
-        </div>
-      )}
-
-      {/* Error */}
-      {!loading && fetchError && (
-        <div className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-          <span>{fetchError}</span>
-          <button onClick={loadStaff} className="text-xs underline ml-4">Thử lại</button>
-        </div>
-      )}
-
-      {/* Table */}
-      {!loading && !fetchError && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-
-          {/* Head — cột xoá chỉ hiện với quản lý */}
-          <div className={`grid ${isManager ? 'grid-cols-[2fr_1fr_1fr_64px]' : 'grid-cols-[2fr_1fr_1fr]'} px-5 py-3 bg-gray-50 border-b border-gray-100`}>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              Tên nhân viên
-              <span className="bg-[#F0E8DF] text-[#8C6F56] text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                {filtered.length}
-              </span>
-            </span>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Vai trò</span>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ca làm việc</span>
-            {isManager && (
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Xoá</span>
-            )}
-          </div>
-
-          {/* Rows */}
-          {filtered.length === 0 ? (
-            <div className="py-12 text-center text-gray-300 text-sm italic">
-              Không tìm thấy nhân viên nào
-            </div>
-          ) : (
-            filtered.map((s, idx) => (
-              <div
-                key={s.id}
-                className={`grid ${isManager ? 'grid-cols-[2fr_1fr_1fr_64px]' : 'grid-cols-[2fr_1fr_1fr]'} px-5 py-3.5 items-center hover:bg-[#FAF7F2] transition-colors ${idx < filtered.length - 1 ? 'border-b border-gray-50' : ''}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#F0E8DF] flex items-center justify-center flex-shrink-0">
-                    <Users size={15} className="text-[#8C6F56]" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">{s.fullName}</span>
-                </div>
-                <span className="text-sm text-gray-500">{s.role}</span>
-                <span className="text-sm text-gray-700">{s.shift}</span>
-                {/* Nút xoá — chỉ quản lý mới thấy */}
-                {isManager && (
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => setDeleteTarget(s)}
-                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* ── Add Modal — chỉ quản lý mới dùng được ── */}
-      {showModal && isManager && (
+      {/* ═══════════════════ Modal sửa vai trò / ca ═══════════════════ */}
+      {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={() => setShowModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+          <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={() => setEditTarget(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-5">
-              <h3 className="text-lg font-bold text-gray-800">Thêm nhân viên mới</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition">
+              <div>
+                <h3 className="text-base font-bold text-gray-800">Cập nhật nhân viên</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{editTarget.fullName}</p>
+              </div>
+              <button onClick={() => setEditTarget(null)} className="text-gray-400 hover:text-gray-600 transition">
                 <X size={20} />
               </button>
             </div>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Tên nhân viên</label>
-                <input
-                  type="text"
-                  placeholder="Nguyễn Văn A"
-                  value={form.fullName}
-                  onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
-                />
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Vai trò</label>
-                <select
-                  value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
-                >
-                  <option value="">-- Chọn vai trò --</option>
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                <div className="relative">
+                  <select
+                    value={editRole}
+                    onChange={e => setEditRole(e.target.value as Role)}
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                  >
+                    {assignableRoles().map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
+
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Ca làm việc</label>
-                <select
-                  value={form.shift}
-                  onChange={e => setForm(f => ({ ...f, shift: e.target.value as Shift }))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
-                >
-                  <option value="">-- Chọn ca --</option>
-                  {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div className="relative">
+                  <select
+                    value={editShift}
+                    onChange={e => setEditShift(e.target.value as Shift)}
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                  >
+                    {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
-              {formError && <p className="text-red-500 text-xs px-1">{formError}</p>}
+
+              {editError && <p className="text-red-500 text-xs px-1">{editError}</p>}
             </div>
+
             <button
-              onClick={handleSave}
-              disabled={saving}
+              onClick={handleEdit}
+              disabled={editSaving}
               className="w-full mt-6 py-3 bg-[#8C6F56] text-white rounded-xl font-bold text-sm hover:bg-[#735a44] transition flex justify-center items-center gap-2 disabled:opacity-60"
             >
-              {saving && <Loader2 size={15} className="animate-spin" />}
-              Thêm nhân viên
+              {editSaving && <Loader2 size={15} className="animate-spin" />}
+              Lưu thay đổi
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Delete Modal — chỉ quản lý mới dùng được ── */}
-      {deleteTarget && isManager && (
+      {/* ═══════════════════ Modal xác nhận xoá ═══════════════════ */}
+      {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={() => setDeleteTarget(null)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
@@ -336,9 +433,9 @@ const StaffPage: React.FC = () => {
               </button>
             </div>
             <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-              Bạn có chắc muốn xoá nhân viên{' '}
-              <span className="font-semibold text-gray-700">{deleteTarget.fullName}</span>?{' '}
-              Hành động này không thể hoàn tác.
+              Bạn có chắc muốn xoá{' '}
+              <span className="font-semibold text-gray-700">{deleteTarget.fullName}</span>{' '}
+              khỏi nhà hàng? Họ có thể xin vào lại nếu muốn.
             </p>
             <div className="flex gap-3">
               <button
@@ -356,6 +453,65 @@ const StaffPage: React.FC = () => {
                 Xoá
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════ Modal duyệt yêu cầu ═══════════════════ */}
+      {approveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={() => setApproveTarget(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="text-base font-bold text-gray-800">Duyệt yêu cầu</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{approveTarget.fullName} — {approveTarget.phone}</p>
+              </div>
+              <button onClick={() => setApproveTarget(null)} className="text-gray-400 hover:text-gray-600 transition">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Vai trò</label>
+                <div className="relative">
+                  <select
+                    value={approveRole}
+                    onChange={e => setApproveRole(e.target.value as Role)}
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                  >
+                    {assignableRoles().map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Ca làm việc</label>
+                <div className="relative">
+                  <select
+                    value={approveShift}
+                    onChange={e => setApproveShift(e.target.value as Shift)}
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                  >
+                    {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {approveError && <p className="text-red-500 text-xs px-1">{approveError}</p>}
+            </div>
+
+            <button
+              onClick={handleApprove}
+              disabled={approveSaving}
+              className="w-full mt-6 py-3 bg-[#8C6F56] text-white rounded-xl font-bold text-sm hover:bg-[#735a44] transition flex justify-center items-center gap-2 disabled:opacity-60"
+            >
+              {approveSaving && <Loader2 size={15} className="animate-spin" />}
+              Xác nhận duyệt
+            </button>
           </div>
         </div>
       )}

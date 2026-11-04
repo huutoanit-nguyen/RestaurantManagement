@@ -27,25 +27,25 @@
 
 ### ✨ Key Features
 
-- **🗺️ Interactive Table Map (Sơ đồ bàn)**:
+- **Interactive Table Map (Sơ đồ bàn)**:
   - Visual grid showing realtime table statuses: `Available`, `Occupied`, `Reserved`, and `Maintenance`.
   - Add, edit, or delete tables with capacity and location tags (e.g., *Indoor, Outdoor, VIP*).
-- **⚡ Realtime Kitchen & Order Synchronization**:
+- **Realtime Kitchen & Order Synchronization**:
   - Powered by Quarkus Next-Generation WebSockets (`/ws/restaurant/{restaurantId}`).
   - Table orders update live across cashier, floor staff, and kitchen devices with zero manual page refreshes.
-- **💳 Multi-Channel Payment System**:
+- ** Multi-Channel Payment System**:
   - **VietQR Transfer**: Dynamic client-side QR generation via VietQR with pre-filled amount, bank account info, and table reference.
   - **POS Card Terminal**: Guided 3-step workflow for chip, contactless, or swipe credit/debit card transactions.
-- **📄 Instant PDF Receipts**:
+- **Instant PDF Receipts**:
   - Clean client-side receipt generation (`jsPDF`) with item breakdown, pricing, VAT, and custom restaurant branding.
-- **🍽️ Dynamic Menu Management**:
+- **Dynamic Menu Management**:
   - Categorized dishes (*Appetizers, Mains, Drinks, Desserts*) with realtime availability toggles.
-- **👥 Role-Based Access Control (RBAC)**:
+- **Role-Based Access Control (RBAC)**:
   - Fine-grained staff permission hierarchy (`Chủ cửa hàng`, `Quản lý`, `Phục vụ`, `Thu ngân`, `Bếp`).
   - Strict privilege escalation protection (staff cannot assign Owner roles or edit higher-ranking peers).
-- **📊 Business Analytics & Reporting**:
+- **Business Analytics & Reporting**:
   - Comprehensive revenue dashboards, order frequencies, average ticket size, and top-selling dishes.
-- **🏢 Multi-Tenant Workspace**:
+- **Multi-Tenant Workspace**:
   - Single phone number login supports owning or working across multiple restaurants with instant workspace switching.
 
 ---

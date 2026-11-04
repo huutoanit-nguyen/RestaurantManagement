@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, UtensilsCrossed, Check, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Check, AlertCircle } from 'lucide-react';
 import { authApi, session } from '../api/auth';
 
 const PHONE_REGEX = /^0\d{9}$/;
@@ -40,25 +40,25 @@ export const RegisterPage: React.FC = () => {
     const errors: Record<string, string> = {};
 
     if (!fullName.trim()) {
-      errors.fullName = 'Họ tên không được để trống';
+      errors.fullName = 'Full name cannot be empty';
     }
 
     if (!phone.trim()) {
-      errors.phone = 'Số điện thoại không được để trống';
+      errors.phone = 'Phone number cannot be empty';
     } else if (!PHONE_REGEX.test(phone.trim())) {
-      errors.phone = 'Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0';
+      errors.phone = 'Phone number must be 10 digits starting with 0';
     }
 
     if (!password) {
-      errors.password = 'Vui lòng nhập mật khẩu';
+      errors.password = 'Please enter a password';
     } else if (!isPasswordValid) {
-      errors.password = 'Mật khẩu chưa đáp ứng đủ 4 điều kiện bên dưới';
+      errors.password = 'Password must meet all 4 conditions below';
     }
 
     if (!confirmPassword) {
-      errors.confirmPassword = 'Vui lòng nhập lại mật khẩu';
+      errors.confirmPassword = 'Please confirm your password';
     } else if (confirmPassword !== password) {
-      errors.confirmPassword = 'Mật khẩu nhập lại không trùng khớp';
+      errors.confirmPassword = 'Passwords do not match';
     }
 
     setFormErrors(errors);
@@ -83,24 +83,23 @@ export const RegisterPage: React.FC = () => {
         fullName: trimmedName,
       });
 
-      // Lưu thông tin đăng ký vào session
+      // Save credentials into session
       session.save(res);
 
-      // Theo yêu cầu: Thành công 201 -> Lưu token, chuyển sang /onboarding
       navigate('/onboarding', { replace: true });
     } catch (err: any) {
       if (err.status === 409) {
         setServerError({
-          message: 'Số điện thoại đã được đăng ký',
+          message: 'Phone number is already registered',
           isConflict: true,
         });
       } else if (err.status === 400) {
         setServerError({
-          message: err.message || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.',
+          message: err.message || 'Invalid input data. Please check again.',
         });
       } else {
         setServerError({
-          message: err.message || 'Đăng ký thất bại. Vui lòng kiểm tra kết nối và thử lại.',
+          message: err.message || 'Registration failed. Please check your connection and try again.',
         });
       }
     } finally {
@@ -109,22 +108,17 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F7F8F5] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link to="/" className="inline-flex items-center gap-2 group mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#8C6F56] text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-            <UtensilsCrossed size={24} />
-          </div>
-          <span className="text-2xl font-bold tracking-tight text-gray-900 group-hover:text-[#8C6F56] transition-colors">
-            Galadan
-          </span>
+        <Link to="/" className="inline-flex items-center justify-center group mb-4">
+          <img src="/logo-resmana.png" alt="ResMana" className="h-10 w-auto object-contain hover:scale-105 transition-transform" />
         </Link>
-        <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-          Tạo tài khoản mới
+        <h2 className="text-2xl font-extrabold text-[#202923] tracking-tight">
+          Create your account
         </h2>
         <p className="mt-1.5 text-sm text-gray-500">
-          Khởi tạo tài khoản quản lý nhà hàng dễ dàng chỉ với vài bước
+          Start managing your restaurant easily in just a few steps
         </p>
       </div>
 
@@ -138,9 +132,9 @@ export const RegisterPage: React.FC = () => {
                 <p className="font-medium">{serverError.message}</p>
                 {serverError.isConflict && (
                   <p className="mt-1 text-xs">
-                    Bạn đã có tài khoản với số điện thoại này?{' '}
+                    Do you already have an account with this number?{' '}
                     <Link to="/login" className="font-bold underline text-red-800 hover:text-red-900">
-                      Đăng nhập ngay
+                      Sign in now
                     </Link>
                   </p>
                 )}
@@ -149,10 +143,10 @@ export const RegisterPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Họ tên */}
+            {/* Full Name */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Họ tên <span className="text-red-500">*</span>
+                Full name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -161,8 +155,8 @@ export const RegisterPage: React.FC = () => {
                   setFullName(e.target.value);
                   if (formErrors.fullName) setFormErrors((prev) => ({ ...prev, fullName: '' }));
                 }}
-                placeholder="Nguyễn Văn A"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm text-gray-800 bg-[#FAF7F2]/50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8C6F56] focus:bg-white transition ${
+                placeholder="e.g. Jamie Davis"
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm text-gray-800 bg-[#F7F8F5]/60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#52735B] focus:bg-white transition ${
                   formErrors.fullName ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                 }`}
               />
@@ -171,10 +165,10 @@ export const RegisterPage: React.FC = () => {
               )}
             </div>
 
-            {/* Số điện thoại */}
+            {/* Phone Number */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Số điện thoại <span className="text-red-500">*</span>
+                Phone number <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
@@ -185,7 +179,7 @@ export const RegisterPage: React.FC = () => {
                 }}
                 placeholder="0901234567"
                 maxLength={10}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm text-gray-800 bg-[#FAF7F2]/50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8C6F56] focus:bg-white transition ${
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm text-gray-800 bg-[#F7F8F5]/60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#52735B] focus:bg-white transition ${
                   formErrors.phone ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                 }`}
               />
@@ -194,10 +188,10 @@ export const RegisterPage: React.FC = () => {
               )}
             </div>
 
-            {/* Mật khẩu */}
+            {/* Password */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Mật khẩu <span className="text-red-500">*</span>
+                Password <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -208,7 +202,7 @@ export const RegisterPage: React.FC = () => {
                     if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: '' }));
                   }}
                   placeholder="••••••••"
-                  className={`w-full px-4 py-2.5 pr-11 rounded-xl border text-sm text-gray-800 bg-[#FAF7F2]/50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8C6F56] focus:bg-white transition ${
+                  className={`w-full px-4 py-2.5 pr-11 rounded-xl border text-sm text-gray-800 bg-[#F7F8F5]/60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#52735B] focus:bg-white transition ${
                     formErrors.password ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                   }`}
                 />
@@ -225,7 +219,7 @@ export const RegisterPage: React.FC = () => {
                 <p className="mt-1 text-xs text-red-500">{formErrors.password}</p>
               )}
 
-              {/* Checklist mật khẩu theo thời gian thực */}
+              {/* Realtime password rules */}
               <div className="mt-2.5 p-3 rounded-xl bg-gray-50 border border-gray-100 grid grid-cols-2 gap-2 text-xs">
                 <div
                   className={`flex items-center gap-1.5 ${
@@ -233,7 +227,7 @@ export const RegisterPage: React.FC = () => {
                   }`}
                 >
                   <Check size={14} className={passwordRules.minLength ? 'text-emerald-500' : 'text-gray-300'} />
-                  <span>8 ký tự</span>
+                  <span>8+ characters</span>
                 </div>
                 <div
                   className={`flex items-center gap-1.5 ${
@@ -241,7 +235,7 @@ export const RegisterPage: React.FC = () => {
                   }`}
                 >
                   <Check size={14} className={passwordRules.hasUpper ? 'text-emerald-500' : 'text-gray-300'} />
-                  <span>Chữ hoa</span>
+                  <span>Uppercase</span>
                 </div>
                 <div
                   className={`flex items-center gap-1.5 ${
@@ -249,7 +243,7 @@ export const RegisterPage: React.FC = () => {
                   }`}
                 >
                   <Check size={14} className={passwordRules.hasLower ? 'text-emerald-500' : 'text-gray-300'} />
-                  <span>Chữ thường</span>
+                  <span>Lowercase</span>
                 </div>
                 <div
                   className={`flex items-center gap-1.5 ${
@@ -257,15 +251,15 @@ export const RegisterPage: React.FC = () => {
                   }`}
                 >
                   <Check size={14} className={passwordRules.hasNumber ? 'text-emerald-500' : 'text-gray-300'} />
-                  <span>Số</span>
+                  <span>Number</span>
                 </div>
               </div>
             </div>
 
-            {/* Nhập lại mật khẩu */}
+            {/* Confirm Password */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Nhập lại mật khẩu <span className="text-red-500">*</span>
+                Confirm password <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -276,7 +270,7 @@ export const RegisterPage: React.FC = () => {
                     if (formErrors.confirmPassword) setFormErrors((prev) => ({ ...prev, confirmPassword: '' }));
                   }}
                   placeholder="••••••••"
-                  className={`w-full px-4 py-2.5 pr-11 rounded-xl border text-sm text-gray-800 bg-[#FAF7F2]/50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8C6F56] focus:bg-white transition ${
+                  className={`w-full px-4 py-2.5 pr-11 rounded-xl border text-sm text-gray-800 bg-[#F7F8F5]/60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#52735B] focus:bg-white transition ${
                     formErrors.confirmPassword ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                   }`}
                 />
@@ -294,24 +288,24 @@ export const RegisterPage: React.FC = () => {
               )}
             </div>
 
-            {/* Nút Đăng ký */}
+            {/* Submit */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl bg-[#8C6F56] text-white text-sm font-bold hover:bg-[#735a44] shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl bg-[#202923] text-[#C7F4A4] text-sm font-bold hover:bg-[#52735B] hover:text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}
-                {loading ? 'Đang gửi thông tin...' : 'Đăng ký'}
+                {loading ? 'Creating account...' : 'Create account'}
               </button>
             </div>
           </form>
 
-          {/* Dưới form: Đã có tài khoản? Đăng nhập */}
+          {/* Footer note */}
           <div className="mt-6 text-center text-sm text-gray-600">
-            Đã có tài khoản?{' '}
-            <Link to="/login" className="font-bold text-[#8C6F56] hover:underline">
-              Đăng nhập
+            Already have an account?{' '}
+            <Link to="/login" className="font-bold text-[#52735B] hover:underline">
+              Sign in
             </Link>
           </div>
         </div>

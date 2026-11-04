@@ -12,7 +12,7 @@ export interface AuthResponse {
   restaurantId?: number | null;
   role?: string | null;
   restaurants?: RestaurantItem[];
-  name?: string; // khi tạo nhà hàng
+  name?: string;
 }
 
 export interface RestaurantDetail {
@@ -23,15 +23,16 @@ export interface RestaurantDetail {
   staffCount?: number;
 }
 
-// Quản lý lưu trữ phiên người dùng
+// Manages reading and writing the current user session to localStorage
 export const session = {
+  /** Persists auth response fields to localStorage */
   save(data: Partial<AuthResponse> & { token?: string }) {
     if (data.token) {
       localStorage.setItem('token', data.token);
     }
     if (data.fullName !== undefined) {
       localStorage.setItem('fullName', data.fullName ?? '');
-      localStorage.setItem('userName', data.fullName ?? ''); // tương thích UI cũ
+      localStorage.setItem('userName', data.fullName ?? '');
     }
     if (data.restaurantId !== undefined) {
       if (data.restaurantId === null) {
@@ -42,7 +43,7 @@ export const session = {
     }
     if (data.role !== undefined) {
       localStorage.setItem('role', data.role ?? '');
-      localStorage.setItem('userRole', data.role ?? ''); // tương thích UI cũ
+      localStorage.setItem('userRole', data.role ?? '');
     }
     if (data.restaurants !== undefined) {
       localStorage.setItem('restaurants', JSON.stringify(data.restaurants ?? []));
@@ -52,6 +53,7 @@ export const session = {
     }
   },
 
+  /** Removes all session keys from localStorage (logout) */
   clear() {
     localStorage.removeItem('token');
     localStorage.removeItem('fullName');
@@ -96,7 +98,7 @@ export const session = {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-// Hàm gọi API dùng chung tự gắn token và xử lý 401
+// Generic API fetch helper — attaches Bearer token and handles 401 auto-logout
 export async function api<T = any>(
   path: string,
   { method = 'GET', body }: { method?: string; body?: any } = {}
@@ -121,15 +123,15 @@ export async function api<T = any>(
   } catch (err: any) {
     throw {
       status: 0,
-      message: err.message || 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc backend.',
+      message: err.message || 'Cannot connect to the server. Check your network or backend.',
     };
   }
 
-  // Token hết hạn (24h) hoặc không hợp lệ -> đăng nhập lại
+  // Token expired or invalid — clear session and redirect to login
   if (res.status === 401 && session.token) {
     session.clear();
     window.location.href = '/login';
-    throw { status: 401, message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
+    throw { status: 401, message: 'Session expired. Please sign in again.' };
   }
 
   const data = res.status === 204 ? null : await res.json().catch(() => null);
@@ -137,10 +139,10 @@ export async function api<T = any>(
   if (!res.ok) {
     let msg = data?.message;
     if (!msg) {
-      if (res.status === 401) msg = 'Sai số điện thoại hoặc mật khẩu';
-      else if (res.status === 409) msg = 'Dữ liệu đã tồn tại hoặc bị trùng lặp';
-      else if (res.status === 400) msg = 'Dữ liệu không hợp lệ';
-      else msg = 'Có lỗi xảy ra, vui lòng thử lại';
+      if (res.status === 401) msg = 'Invalid phone number or password';
+      else if (res.status === 409) msg = 'Data already exists or conflicts';
+      else if (res.status === 400) msg = 'Invalid request data';
+      else msg = 'An error occurred. Please try again.';
     }
     throw { status: res.status, message: msg, data };
   }
@@ -148,38 +150,30 @@ export async function api<T = any>(
   return data as T;
 }
 
-// API Authentication
+// Authentication API endpoints
 export const authApi = {
+  /** Registers a new account */
   register(payload: { phone: string; password: string; fullName: string }): Promise<AuthResponse> {
-    return api<AuthResponse>('/api/auth/register', {
-      method: 'POST',
-      body: payload,
-    });
+    return api<AuthResponse>('/api/auth/register', { method: 'POST', body: payload });
   },
 
+  /** Authenticates an existing user */
   login(payload: { phone: string; password: string }): Promise<AuthResponse> {
-    return api<AuthResponse>('/api/auth/login', {
-      method: 'POST',
-      body: payload,
-    });
+    return api<AuthResponse>('/api/auth/login', { method: 'POST', body: payload });
   },
 
+  /** Issues a scoped token for the chosen restaurant */
   selectRestaurant(restaurantId: number): Promise<AuthResponse> {
-    return api<AuthResponse>('/api/auth/select-restaurant', {
-      method: 'POST',
-      body: { restaurantId },
-    });
+    return api<AuthResponse>('/api/auth/select-restaurant', { method: 'POST', body: { restaurantId } });
   },
 
+  /** Creates a new restaurant workspace for the current user */
   createRestaurant(name: string): Promise<AuthResponse> {
-    return api<AuthResponse>('/api/restaurants', {
-      method: 'POST',
-      body: { name },
-    });
+    return api<AuthResponse>('/api/restaurants', { method: 'POST', body: { name } });
   },
 
+  /** Returns detailed info for the currently selected restaurant */
   getRestaurantMe(): Promise<RestaurantDetail> {
     return api<RestaurantDetail>('/api/restaurants/me');
   },
 };
-

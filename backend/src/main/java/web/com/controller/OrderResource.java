@@ -13,9 +13,11 @@ import web.com.model.OrderItem;
 import web.com.model.TableEntity;
 import web.com.security.Roles;
 import web.com.security.TenantContext;
+import web.com.websocket.WebSocketBroadcaster;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Path("/api/orders")
 @Produces(MediaType.APPLICATION_JSON)
@@ -23,6 +25,7 @@ import java.util.List;
 public class OrderResource {
 
     @Inject TenantContext tenant;
+    @Inject WebSocketBroadcaster broadcaster;
 
     // ── Request records ───────────────────────────────────────────────────────
     public record OrderItemRequest(Long menuItemId, int quantity) {}
@@ -95,6 +98,9 @@ public class OrderResource {
         // Cập nhật trạng thái bàn sang OCCUPIED
         table.status = "OCCUPIED";
 
+        broadcaster.broadcast(rid, "ORDER_CREATED", order);
+        broadcaster.broadcast(rid, "TABLE_UPDATED", table);
+
         return Response.status(Response.Status.CREATED).entity(order).build();
     }
 
@@ -139,6 +145,7 @@ public class OrderResource {
         }
 
         order.recalculateTotal();
+        broadcaster.broadcast(rid, "ORDER_UPDATED", order);
         return order;
     }
 
@@ -161,8 +168,10 @@ public class OrderResource {
         TableEntity table = TableEntity.findByIdAndRestaurant(order.tableId, order.restaurantId);
         if (table != null) {
             table.status = "AVAILABLE";
+            broadcaster.broadcast(order.restaurantId, "TABLE_UPDATED", table);
         }
 
+        broadcaster.broadcast(order.restaurantId, "ORDER_PAID", order);
         return order;
     }
 
@@ -173,7 +182,9 @@ public class OrderResource {
     @RolesAllowed(Roles.QUAN_LY)
     public Response delete(@PathParam("id") Long id) {
         Order order = findOrThrow(id);
+        Long rid = tenant.restaurantId();
         order.delete();
+        broadcaster.broadcast(rid, "ORDER_DELETED", Map.of("id", id));
         return Response.noContent().build();
     }
 

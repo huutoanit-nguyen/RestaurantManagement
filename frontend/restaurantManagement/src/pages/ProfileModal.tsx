@@ -64,7 +64,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose }) => {
         <div className="pt-5">
           {loading && (
             <div className="flex items-center justify-center py-12 gap-2 text-gray-400">
-              <Loader2 size={20} className="animate-spin text-[#8C6F56]" />
+              <Loader2 size={20} className="animate-spin text-[#52735B]" />
               <span className="text-sm font-medium">Đang tải thông tin...</span>
             </div>
           )}
@@ -77,11 +77,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose }) => {
             <div className="space-y-5">
               {/* Avatar + Tên + Role */}
               <div className="flex flex-col items-center pb-4 border-b border-gray-100">
-                <div className="w-16 h-16 rounded-full bg-[#FAF7F2] border border-[#8C6F56]/20 flex items-center justify-center mb-3 shadow-xs">
-                  <User size={32} className="text-[#8C6F56]" />
+                <div className="w-16 h-16 rounded-full bg-[#F7F8F5] border border-[#202923]/15 flex items-center justify-center mb-3 shadow-xs">
+                  <User size={32} className="text-[#52735B]" />
                 </div>
                 <p className="text-lg font-bold text-gray-900">{profile.fullName}</p>
-                <span className="mt-1.5 text-xs font-bold px-3 py-1 rounded-md bg-[#8C6F56]/15 text-[#8C6F56]">
+                <span className="mt-1.5 text-xs font-bold px-3 py-1 rounded-md bg-[#C7F4A4] text-[#202923]">
                   {profile.role || 'Thành viên'}
                 </span>
               </div>
@@ -92,7 +92,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose }) => {
                   { label: 'Số điện thoại', value: profile.phone || session.fullName, mono: true },
                   { label: 'Vai trò',        value: profile.role || session.role || 'Thành viên' },
                   { label: 'Ca làm việc',   value: profile.shift || 'Tất cả' },
-                  { label: 'Nhà hàng',      value: session.restaurantName || 'Galadan' },
+                  { label: 'Nhà hàng',      value: session.restaurantName || 'ResMana' },
                 ].map(({ label, value, mono }) => (
                   <div key={label} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
                     <span className="text-sm font-medium text-gray-500">{label}</span>

@@ -233,15 +233,15 @@ const StaffPage: React.FC = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto bg-[#FAF7F2] p-6">
+    <div className="flex-1 overflow-y-auto bg-[#F7F8F5] p-6">
       <div className="max-w-3xl mx-auto space-y-6">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Users size={22} className="text-[#8C6F56]" />
+            <Users size={22} className="text-[#52735B]" />
             <div>
-              <h1 className="text-xl font-bold text-gray-800">Nhân viên</h1>
+              <h1 className="text-xl font-bold text-[#202923]">Nhân viên</h1>
               <p className="text-xs text-gray-400">{staff.length} thành viên</p>
             </div>
           </div>
@@ -269,13 +269,13 @@ const StaffPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => openApprove(jr)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#8C6F56] text-white text-xs font-medium hover:bg-[#735a44] transition"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#202923] text-[#C7F4A4] text-xs font-bold hover:bg-[#52735B] hover:text-white transition cursor-pointer"
                       >
                         <UserCheck size={13} /> Duyệt
                       </button>
                       <button
                         onClick={() => handleReject(jr)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition cursor-pointer"
                       >
                         <UserX size={13} /> Từ chối
                       </button>
@@ -295,14 +295,14 @@ const StaffPage: React.FC = () => {
             placeholder="Tìm theo tên, SĐT hoặc vai trò..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8C6F56] transition"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#52735B] transition"
           />
         </div>
 
         {/* ── List ── */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 size={28} className="animate-spin text-[#8C6F56]" />
+            <Loader2 size={28} className="animate-spin text-[#52735B]" />
           </div>
         ) : fetchError ? (
           <div className="bg-red-50 text-red-600 rounded-xl px-4 py-3 text-sm">{fetchError}</div>
@@ -321,8 +321,8 @@ const StaffPage: React.FC = () => {
               >
                 {/* Avatar + info */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-[#8C6F56]/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[#8C6F56] font-bold text-sm">
+                  <div className="w-9 h-9 rounded-full bg-[#52735B]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[#52735B] font-bold text-sm">
                       {s.fullName.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -341,14 +341,14 @@ const StaffPage: React.FC = () => {
                     <>
                       <button
                         onClick={() => openEdit(s)}
-                        className="p-2 rounded-lg hover:bg-[#FAF7F2] text-gray-400 hover:text-[#8C6F56] transition"
+                        className="p-2 rounded-lg hover:bg-[#F7F8F5] text-gray-400 hover:text-[#52735B] transition cursor-pointer"
                         title="Sửa vai trò / ca"
                       >
                         <Edit2 size={15} />
                       </button>
                       <button
                         onClick={() => setDeleteTarget(s)}
-                        className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition"
+                        className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition cursor-pointer"
                         title="Xoá khỏi nhà hàng"
                       >
                         <Trash2 size={15} />
@@ -384,7 +384,7 @@ const StaffPage: React.FC = () => {
                   <select
                     value={editRole}
                     onChange={e => setEditRole(e.target.value as Role)}
-                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
                   >
                     {assignableRoles().map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
@@ -398,7 +398,7 @@ const StaffPage: React.FC = () => {
                   <select
                     value={editShift}
                     onChange={e => setEditShift(e.target.value as Shift)}
-                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
                   >
                     {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -412,7 +412,7 @@ const StaffPage: React.FC = () => {
             <button
               onClick={handleEdit}
               disabled={editSaving}
-              className="w-full mt-6 py-3 bg-[#8C6F56] text-white rounded-xl font-bold text-sm hover:bg-[#735a44] transition flex justify-center items-center gap-2 disabled:opacity-60"
+              className="w-full mt-6 py-3 bg-[#202923] text-[#C7F4A4] rounded-xl font-bold text-sm hover:bg-[#52735B] hover:text-white transition flex justify-center items-center gap-2 disabled:opacity-60 cursor-pointer"
             >
               {editSaving && <Loader2 size={15} className="animate-spin" />}
               Lưu thay đổi
@@ -479,7 +479,7 @@ const StaffPage: React.FC = () => {
                   <select
                     value={approveRole}
                     onChange={e => setApproveRole(e.target.value as Role)}
-                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
                   >
                     {assignableRoles().map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
@@ -493,7 +493,7 @@ const StaffPage: React.FC = () => {
                   <select
                     value={approveShift}
                     onChange={e => setApproveShift(e.target.value as Shift)}
-                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
                   >
                     {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -507,7 +507,7 @@ const StaffPage: React.FC = () => {
             <button
               onClick={handleApprove}
               disabled={approveSaving}
-              className="w-full mt-6 py-3 bg-[#8C6F56] text-white rounded-xl font-bold text-sm hover:bg-[#735a44] transition flex justify-center items-center gap-2 disabled:opacity-60"
+              className="w-full mt-6 py-3 bg-[#202923] text-[#C7F4A4] rounded-xl font-bold text-sm hover:bg-[#52735B] hover:text-white transition flex justify-center items-center gap-2 disabled:opacity-60 cursor-pointer"
             >
               {approveSaving && <Loader2 size={15} className="animate-spin" />}
               Xác nhận duyệt

@@ -1,232 +1,536 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import {
-  UtensilsCrossed,
-  Store,
-  UserCheck,
-  ArrowRight,
-  Loader2,
-  AlertCircle,
-  LogOut,
-  Sparkles,
-  Phone,
-  Info,
-} from 'lucide-react';
+import React, { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Logo, Glyph, Dashboard } from './LandingPage';
 import { authApi, session } from '../api/auth';
+import '../marketing.css';
+
+const restaurantPhoto = `${import.meta.env.BASE_URL}images/restaurant.jpg`;
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
+  const isLoggedIn = !!session.token;
 
-  const [restaurantName, setRestaurantName] = useState('');
+  const [step, setStep] = useState(0);
+  const [restaurant, setRestaurant] = useState('');
+  const [type, setType] = useState('Restaurant');
+  const [size, setSize] = useState('1–5 people');
+  const [goals, setGoals] = useState<string[]>(['Bring orders together']);
+  const [complete, setComplete] = useState(false);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Thẻ B: Số điện thoại chủ quán (tham gia nhà hàng - Sắp có)
+  // Staff join modal / toggle
+  const [showStaffJoin, setShowStaffJoin] = useState(false);
   const [ownerPhone, setOwnerPhone] = useState('');
-  const [showJoinNotice, setShowJoinNotice] = useState(false);
+  const [staffNotice, setStaffNotice] = useState('');
 
-  const handleCreateRestaurant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = restaurantName.trim();
+  const steps = ['Your restaurant', 'Your priorities', 'Ready to grow'];
+
+  const goHome = () => {
+    navigate('/');
+  };
+
+  const handleCreateRestaurant = async () => {
+    const trimmed = restaurant.trim();
     if (!trimmed) {
-      setError('Vui lòng nhập tên nhà hàng của bạn');
+      setError('A restaurant needs a name. What’s yours?');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await authApi.createRestaurant(trimmed);
-
-      // Lưu token mới, restaurantId và role theo response 201:
-      // { "token": "...", "restaurantId": 3, "name": "Quán Ngon", "role": "Chủ cửa hàng" }
-      session.save({
-        token: res.token,
-        restaurantId: res.restaurantId,
-        role: res.role || 'Chủ cửa hàng',
-        name: res.name || trimmed,
-        fullName: res.fullName || session.fullName,
-      });
-
-      // Chuyển hướng vào /app
-      navigate('/app', { replace: true });
-    } catch (err: any) {
-      if (err.status === 409) {
-        setError('Bạn đã đăng ký nhà hàng rồi');
-      } else {
-        setError(err.message || 'Không thể tạo nhà hàng. Vui lòng thử lại.');
+    if (isLoggedIn) {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await authApi.createRestaurant(trimmed);
+        session.save({
+          token: res.token,
+          restaurantId: res.restaurantId,
+          role: res.role || 'Restaurant Owner',
+          name: res.name || trimmed,
+          fullName: res.fullName || session.fullName,
+        });
+        setComplete(true);
+      } catch (err: any) {
+        if (err.status === 409) {
+          setError('You have already registered this restaurant.');
+        } else {
+          setError(err.message || 'Unable to create restaurant. Please try again.');
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
+    } else {
+      // Guest mode - preview
+      setComplete(true);
     }
   };
 
-  const handleLogout = () => {
-    session.clear();
-    navigate('/login', { replace: true });
+  const goNext = (event: FormEvent) => {
+    event.preventDefault();
+    if (step === 0 && !restaurant.trim()) {
+      setError('A restaurant needs a name. What’s yours?');
+      return;
+    }
+    if (step === 1 && goals.length === 0) {
+      setError('Choose at least one priority to get started.');
+      return;
+    }
+    setError('');
+
+    if (step < 2) {
+      setStep(step + 1);
+    } else {
+      handleCreateRestaurant();
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-[#FAF7F2] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-2xl text-center">
-        <Link to="/" className="inline-flex items-center gap-2 group mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#8C6F56] text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-            <UtensilsCrossed size={24} />
-          </div>
-          <span className="text-2xl font-bold tracking-tight text-gray-900 group-hover:text-[#8C6F56] transition-colors">
-            Galadan
+  const handleStaffJoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ownerPhone.trim()) {
+      setStaffNotice("Please enter the restaurant owner's phone number.");
+      return;
+    }
+    setStaffNotice(
+      `Your request has been sent to the owner (${ownerPhone.trim()}). Management will review your account shortly!`
+    );
+  };
+
+  if (complete) {
+    return (
+      <div className="rm-site onboarding-success">
+        <header className="success-header">
+          <button onClick={goHome} aria-label="Return home" style={{ background: 'transparent', border: 0 }}>
+            <Logo />
+          </button>
+          <span className="preview-pill">
+            {isLoggedIn ? 'WORKSPACE READY' : 'INTERACTIVE PREVIEW'}
           </span>
-        </Link>
-        <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-          Bắt đầu với Galadan
-        </h2>
-        <p className="mt-2 text-base text-gray-600 max-w-lg mx-auto">
-          Xin chào <strong className="text-gray-900">{session.fullName || 'bạn'}</strong>! Bạn muốn quản lý một nhà hàng mới hay tham gia vào nhà hàng của người khác?
-        </p>
-      </div>
+        </header>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-3xl px-4 sm:px-0">
-        {/* Lỗi cảnh báo */}
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-3 shadow-sm">
-            <AlertCircle size={18} className="flex-shrink-0 text-red-500" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* THẺ A: "Tôi là chủ quán, tạo nhà hàng" */}
-          <div className="bg-white rounded-2xl p-6 sm:p-7 shadow-xl border-2 border-[#8C6F56] relative flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                  <Store size={24} />
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#8C6F56] text-white flex items-center gap-1 shadow-sm">
-                  <Sparkles size={12} /> Khuyên dùng
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Tôi là chủ quán, tạo nhà hàng
-              </h3>
-              <p className="text-xs text-gray-600 mb-6 leading-relaxed">
-                Tự tạo nhà hàng trong 1 phút. Bạn sẽ có toàn quyền cấu hình sơ đồ bàn, menu, nhân sự và báo cáo doanh thu.
-              </p>
-
-              <form onSubmit={handleCreateRestaurant} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Tên nhà hàng <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={restaurantName}
-                    onChange={(e) => {
-                      setRestaurantName(e.target.value);
-                      setError(null);
-                    }}
-                    placeholder="Ví dụ: Quán Ngon Galadan"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 bg-[#FAF7F2]/50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8C6F56] focus:bg-white transition"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 px-4 rounded-xl bg-[#8C6F56] text-white text-sm font-bold hover:bg-[#735a44] shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-                >
-                  {loading && <Loader2 size={16} className="animate-spin" />}
-                  {loading ? 'Đang tạo nhà hàng...' : 'Tạo nhà hàng ngay'}
-                  {!loading && <ArrowRight size={16} />}
-                </button>
-              </form>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-gray-100 text-[11px] text-gray-400">
-              ✓ Miễn phí khởi tạo • Không giới hạn số lượng bàn
-            </div>
-          </div>
-
-          {/* THẺ B: "Tôi là nhân viên, tham gia nhà hàng" */}
-          <div className="bg-white/80 rounded-2xl p-6 sm:p-7 shadow-lg border border-gray-200 relative flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <UserCheck size={24} />
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                  Sắp có
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Tôi là nhân viên, tham gia nhà hàng
-              </h3>
-              <p className="text-xs text-gray-600 mb-6 leading-relaxed">
-                Nhập số điện thoại của chủ quán để gửi yêu cầu tham gia. Sau khi chủ quán duyệt và phân vai trò, bạn có thể bắt đầu làm việc.
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Số điện thoại chủ quán
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      value={ownerPhone}
-                      onChange={(e) => setOwnerPhone(e.target.value)}
-                      placeholder="0901234567"
-                      className="w-full px-4 py-2.5 pl-10 rounded-xl border border-gray-200 text-sm text-gray-800 bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-                    />
-                    <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowJoinNotice(true)}
-                  className="w-full py-3 px-4 rounded-xl bg-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-300 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Tìm & Xin tham gia
-                </button>
-
-                {showJoinNotice && (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
-                    <Info size={16} className="flex-shrink-0 mt-0.5 text-amber-600" />
-                    <span>
-                      Tính năng tham gia nhà hàng theo số điện thoại chủ quán đang trong giai đoạn hoàn thiện ở bước tiếp theo. Vui lòng tạo nhà hàng riêng để trải nghiệm trước!
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-gray-100 text-[11px] text-gray-400">
-              ✓ Kết nối nhanh chóng với chủ quán
-            </div>
-          </div>
+        <div className="success-intro">
+          <span className="success-check">
+            <Glyph name="check" size={27} />
+          </span>
+          <div className="rm-eyebrow">HERE’S TO YOUR NEXT CHAPTER</div>
+          <h1>Looking good, {restaurant}.</h1>
+          <p>
+            {isLoggedIn
+              ? 'Your restaurant is ready to go. Configure tables, craft menus, and take your first orders!'
+              : 'This is a taste of your new everyday. Less juggling. More possibility.'}
+          </p>
+          <span className="preview-disclaimer">
+            {isLoggedIn
+              ? `Workspace connected to account: ${session.fullName || 'You'}`
+              : 'Demo workspace preview. You can create an account anytime to save your restaurant.'}
+          </span>
         </div>
 
-        {/* Chân trang Onboarding */}
-        <div className="mt-8 text-center flex items-center justify-between px-2 text-xs">
-          <Link to="/" className="text-gray-500 hover:text-gray-700">
-            ← Quay lại trang chủ
-          </Link>
+        <div className="success-dashboard">
+          <Dashboard restaurant={restaurant} />
+        </div>
+
+        <div className="success-bottom">
           <button
-            onClick={handleLogout}
-            className="text-gray-500 hover:text-red-600 flex items-center gap-1 cursor-pointer"
+            className="rm-button outline"
+            onClick={() => {
+              setComplete(false);
+              setStep(0);
+            }}
           >
-            <LogOut size={14} /> Đăng xuất tài khoản
+            Edit your setup
+          </button>
+
+          {isLoggedIn ? (
+            <button className="rm-button" onClick={() => navigate('/app')}>
+              Go to Workspace <Glyph size={17} />
+            </button>
+          ) : (
+            <button
+              className="rm-button"
+              onClick={() =>
+                navigate(`/register?restaurant=${encodeURIComponent(restaurant)}`)
+              }
+            >
+              Sign up to save workspace <Glyph size={17} />
+            </button>
+          )}
+
+          <button className="rm-button outline" onClick={goHome}>
+            Back to ResMana <Glyph size={17} />
           </button>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="rm-site rm-onboarding">
+      {/* Left Aside */}
+      <aside className="onboard-aside">
+        <button
+          className="onboard-logo"
+          onClick={goHome}
+          aria-label="Return to ResMana home"
+          style={{ background: 'transparent', border: 0 }}
+        >
+          <Logo />
+        </button>
+
+        <div className="onboard-aside-copy">
+          <span className="rm-eyebrow">A FRESH START, TOGETHER.</span>
+          <h2>
+            A little less
+            <br />
+            managing.
+            <br />
+            <span>
+              A lot more
+              <br />
+              possibility.
+            </span>
+          </h2>
+          <p>
+            Let’s make space for the things that made you fall in love with
+            hospitality.
+          </p>
+          <div className="onboard-mini-photo">
+            <img
+              src={restaurantPhoto}
+              alt="Guests enjoying a sunny, welcoming restaurant"
+            />
+            <span>
+              <Glyph name="leaf" size={18} />
+              Made for your kind of busy.
+            </span>
+          </div>
+        </div>
+
+        <div className="onboard-aside-bottom">
+          <span className="announcement-dot" />
+          Hospitality at heart. Simplicity in mind.
+        </div>
+      </aside>
+
+      {/* Right Main */}
+      <main className="onboard-main">
+        <div className="onboard-top">
+          <button onClick={goHome} style={{ background: 'transparent', border: 0 }}>
+            <span>←</span> Back to home
+          </button>
+          <span>Just a few little things.</span>
+        </div>
+
+        <div className="onboard-form-wrap">
+          {/* Progress Indicator */}
+          <div className="onboard-steps" aria-label="Setup progress">
+            {steps.map((label, i) => (
+              <div key={label} className={i <= step ? 'current' : ''}>
+                <span>
+                  {i < step ? <Glyph name="check" size={13} /> : `0${i + 1}`}
+                </span>
+                <small>{label}</small>
+              </div>
+            ))}
+          </div>
+
+          <div className="rm-eyebrow">STEP 0{step + 1} OF 03</div>
+          <h1>
+            {
+              [
+                'First, let’s meet your restaurant.',
+                'What’s on your plate?',
+                'A fresh start looks good on you.',
+              ][step]
+            }
+          </h1>
+          <p className="onboard-description">
+            {
+              [
+                'Every great service starts somewhere. Tell us a little about your place.',
+                'Choose what you’d like a helping hand with. We’ll shape the experience around you.',
+                'Here’s what we’ve put together. Take a look before exploring your restaurant workspace.',
+              ][step]
+            }
+          </p>
+
+          <form onSubmit={goNext}>
+            {/* Step 1: Restaurant Details */}
+            {step === 0 && (
+              <div className="onboard-fields">
+                <label htmlFor="restaurant-name">
+                  Your restaurant’s name <span>*</span>
+                </label>
+                <input
+                  autoFocus
+                  id="restaurant-name"
+                  name="restaurant"
+                  value={restaurant}
+                  onChange={(e) => {
+                    setRestaurant(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="e.g. The Green Table"
+                  maxLength={60}
+                  aria-invalid={!!error}
+                  aria-describedby={error ? 'onboard-error' : undefined}
+                />
+
+                <label htmlFor="restaurant-type">
+                  What kind of place do you run?
+                </label>
+                <div className="select-wrap">
+                  <select
+                    id="restaurant-type"
+                    value={type}
+                    onChange={(e) => setType(e.target.value)}
+                  >
+                    {[
+                      'Restaurant',
+                      'Café & coffee shop',
+                      'Bakery',
+                      'Bar & pub',
+                      'Food truck',
+                      'Something else',
+                    ].map((value) => (
+                      <option key={value}>{value}</option>
+                    ))}
+                  </select>
+                  <Glyph name="chevron" size={16} />
+                </div>
+
+                <label htmlFor="team-size">How big is your team?</label>
+                <div className="select-wrap">
+                  <select
+                    id="team-size"
+                    value={size}
+                    onChange={(e) => setSize(e.target.value)}
+                  >
+                    {[
+                      'Just me',
+                      '1–5 people',
+                      '6–15 people',
+                      '16–30 people',
+                      '31+ people',
+                    ].map((value) => (
+                      <option key={value}>{value}</option>
+                    ))}
+                  </select>
+                  <Glyph name="chevron" size={16} />
+                </div>
+
+                <div className="onboard-tip">
+                  <Glyph name="leaf" size={18} />
+                  <p>
+                    Big ambitions, small beginnings, or somewhere in between.
+                    <br />
+                    You’re in the right place.
+                  </p>
+                </div>
+
+                {/* Staff Join Option */}
+                <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #e5ecd9' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffJoin(!showStaffJoin)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#52735b',
+                      fontSize: '11px',
+                      fontWeight: 650,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>{showStaffJoin ? '−' : '+'}</span>
+                    Are you a staff member joining an existing restaurant?
+                  </button>
+
+                  {showStaffJoin && (
+                    <div style={{ marginTop: '12px', padding: '14px', background: '#f7f9f4', borderRadius: '8px', border: '1px solid #dce5d3' }}>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: '#4a5b42', marginBottom: '6px' }}>
+                        Owner's phone number
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="tel"
+                          value={ownerPhone}
+                          onChange={(e) => setOwnerPhone(e.target.value)}
+                          placeholder="e.g. 0912345678"
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            border: '1px solid #d0dac6',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleStaffJoin}
+                          className="rm-button small"
+                          style={{ padding: '8px 14px' }}
+                        >
+                          Send request
+                        </button>
+                      </div>
+                      {staffNotice && (
+                        <p style={{ marginTop: '8px', fontSize: '10px', color: '#52735b', lineHeight: 1.5 }}>
+                          {staffNotice}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Priorities */}
+            {step === 1 && (
+              <fieldset className="goal-options">
+                <legend className="sr-only">
+                  Choose your restaurant priorities
+                </legend>
+                {[
+                  {
+                    name: 'Bring orders together',
+                    description: 'A smoother flow from table to kitchen.',
+                    icon: 'order',
+                  },
+                  {
+                    name: 'Take care of my team',
+                    description: 'Clearer shifts. A happier team.',
+                    icon: 'team',
+                  },
+                  {
+                    name: 'Understand my business',
+                    description: 'A fresh perspective on your numbers.',
+                    icon: 'chart',
+                  },
+                  {
+                    name: 'Simplify the everyday',
+                    description: 'Less juggling. More breathing room.',
+                    icon: 'grid',
+                  },
+                ].map((goal) => (
+                  <label
+                    className={goals.includes(goal.name) ? 'chosen' : ''}
+                    key={goal.name}
+                  >
+                    <Glyph name={goal.icon} size={23} />
+                    <span>
+                      <strong>{goal.name}</strong>
+                      <small>{goal.description}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={goals.includes(goal.name)}
+                      onChange={() => {
+                        setGoals(
+                          goals.includes(goal.name)
+                            ? goals.filter((g) => g !== goal.name)
+                            : [...goals, goal.name]
+                        );
+                        setError('');
+                      }}
+                    />
+                  </label>
+                ))}
+              </fieldset>
+            )}
+
+            {/* Step 3: Summary */}
+            {step === 2 && (
+              <div className="onboard-summary">
+                <div className="summary-restaurant">
+                  <span>{restaurant.trim()[0]?.toUpperCase() || 'R'}</span>
+                  <div>
+                    <h3>{restaurant}</h3>
+                    <p>
+                      {type} <span>·</span> {size}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setStep(0)}>
+                    Edit
+                  </button>
+                </div>
+                <div className="summary-goals">
+                  <div>
+                    <span className="rm-eyebrow">A LITTLE MORE FOCUS ON</span>
+                    <button type="button" onClick={() => setStep(1)}>
+                      Edit
+                    </button>
+                  </div>
+                  {goals.map((goal) => (
+                    <p key={goal}>
+                      <Glyph name="check" size={16} />
+                      {goal}
+                    </p>
+                  ))}
+                </div>
+                <div className="summary-note">
+                  <Glyph name="leaf" size={21} />
+                  <p>
+                    {isLoggedIn
+                      ? 'Click continue to create and launch your restaurant workspace on ResMana.'
+                      : 'Your next chapter starts with a look around. You can explore a live preview or sign up anytime.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Error banner */}
+            {error && (
+              <p className="onboard-error" id="onboard-error" role="alert">
+                {error}
+              </p>
+            )}
+
+            {/* Form actions */}
+            <div className="onboard-form-actions">
+              {step > 0 && (
+                <button
+                  type="button"
+                  className="rm-text-button"
+                  onClick={() => {
+                    setStep(step - 1);
+                    setError('');
+                  }}
+                  style={{ background: 'transparent', border: 0 }}
+                >
+                  ← Back
+                </button>
+              )}
+              <button type="submit" className="rm-button" disabled={loading}>
+                {loading
+                  ? 'Creating your restaurant...'
+                  : step === 2
+                    ? isLoggedIn
+                      ? 'Launch restaurant workspace'
+                      : 'Explore my sample workspace'
+                    : 'Continue'}
+                <Glyph size={17} />
+              </button>
+            </div>
+
+            <p className="onboard-fine-print">
+              <Glyph name="check" size={12} />
+              {isLoggedIn
+                ? 'Signed in • Full workspace unlocked'
+                : 'No credit card needed. Just a little exploring.'}
+            </p>
+          </form>
+        </div>
+
+        <div className="onboard-bottom">
+          <span>© {new Date().getFullYear()} ResMana</span>
+          <span>Your restaurant. Your rhythm.</span>
+        </div>
+      </main>
     </div>
   );
 };
 
 export default OnboardingPage;
-

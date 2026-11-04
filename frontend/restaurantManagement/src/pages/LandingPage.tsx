@@ -1,669 +1,895 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  UtensilsCrossed,
-  LayoutGrid,
-  Receipt,
-  BookOpen,
-  TrendingUp,
-  ShieldCheck,
-  Zap,
-  ArrowRight,
-  Phone,
-  Mail,
-  Menu,
-  X,
-  ChefHat,
-  UserCog,
-  Crown,
-  CreditCard,
-  ConciergeBell,
-  Sparkles,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { session } from '../api/auth';
+import '../marketing.css';
 
-const LandingPage: React.FC = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isLoggedIn = !!session.token;
+const restaurantPhoto = `${import.meta.env.BASE_URL}images/restaurant.jpg`;
 
+export function Logo() {
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-gray-800 font-sans selection:bg-[#8C6F56] selection:text-white">
-      {/* 1. THANH MENU (STICKY) */}
-      <header className="sticky top-0 z-50 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#8C6F56]/15 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          {/* Logo + Tên App */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-xl bg-[#8C6F56] text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-              <UtensilsCrossed size={22} />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-gray-900 group-hover:text-[#8C6F56] transition-colors">
-                Galadan
-              </span>
-              <span className="block text-[10px] uppercase tracking-widest text-[#8C6F56] font-semibold -mt-1">
-                Quản Lý Nhà Hàng
-              </span>
-            </div>
-          </Link>
+    <span className="rm-logo">
+      <svg viewBox="0 0 104 104" fill="none" aria-hidden="true">
+        <rect width="104" height="104" rx="28" fill="currentColor" />
+        <path
+          d="M27 23V43Q27 53 37 53V78M38 23V42M49 23V43Q49 53 39 53M56 26H62Q78 26 78 41Q78 55 60 55H56L79 78"
+          stroke="var(--logo-ink, #C7F4A4)"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span>
+        ResMana
+      </span>
+    </span>
+  );
+}
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-sm font-medium text-gray-600 hover:text-[#8C6F56] transition-colors"
-            >
-              Tính năng
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-sm font-medium text-gray-600 hover:text-[#8C6F56] transition-colors"
-            >
-              Cách hoạt động
-            </a>
-            <a
-              href="#roles"
-              className="text-sm font-medium text-gray-600 hover:text-[#8C6F56] transition-colors"
-            >
-              Vai trò
-            </a>
-            <a
-              href="#contact"
-              className="text-sm font-medium text-gray-600 hover:text-[#8C6F56] transition-colors"
-            >
-              Liên hệ
-            </a>
-          </nav>
+export interface GlyphProps {
+  name?: string;
+  size?: number;
+}
 
-          {/* Action Buttons */}
-          <div className="hidden md:flex items-center gap-3">
-            {isLoggedIn ? (
-              <Link
-                to="/app"
-                className="px-5 py-2.5 rounded-xl bg-[#8C6F56] text-white text-sm font-semibold hover:bg-[#735a44] shadow-sm hover:shadow transition-all flex items-center gap-2"
-              >
-                Vào ứng dụng <ArrowRight size={16} />
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="px-4 py-2 rounded-xl border border-[#8C6F56] text-[#8C6F56] text-sm font-semibold hover:bg-[#8C6F56]/10 transition-colors"
-                >
-                  Đăng nhập
-                </Link>
-                <Link
-                  to="/register"
-                  className="px-5 py-2 rounded-xl bg-[#8C6F56] text-white text-sm font-semibold hover:bg-[#735a44] shadow-sm hover:shadow transition-all"
-                >
-                  Đăng ký
-                </Link>
-              </>
-            )}
-          </div>
+export function Glyph({ name = 'arrow', size = 20 }: GlyphProps) {
+  const paths: Record<string, React.ReactNode> = {
+    arrow: <path d="M4 12h15m-6-6 6 6-6 6" />,
+    check: <path d="m5 12 4 4L19 6" />,
+    chevron: <path d="m8 10 4 4 4-4" />,
+    play: <path d="m9 5 11 7-11 7V5Z" />,
+    close: <path d="m6 6 12 12M6 18 18 6" />,
+    menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+    grid: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="2" />
+        <rect x="14" y="3" width="7" height="7" rx="2" />
+        <rect x="3" y="14" width="7" height="7" rx="2" />
+        <rect x="14" y="14" width="7" height="7" rx="2" />
+      </>
+    ),
+    chart: (
+      <>
+        <path d="M4 3v17h17M8 14l4-5 4 2 5-7" />
+      </>
+    ),
+    team: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v2" />
+      </>
+    ),
+    order: (
+      <>
+        <rect x="5" y="4" width="14" height="17" rx="2" />
+        <path d="M9 4V2m6 2V2M9 10h6m-6 4h6m-6 4h3" />
+      </>
+    ),
+    leaf: (
+      <>
+        <path d="M20 3C9 2 2 6 5 15c9 4 15-3 15-12ZM4 21 16 8" />
+      </>
+    ),
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+    mail: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="m3 7 9 6 9-6" />
+      </>
+    ),
+    star: (
+      <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z" />
+    ),
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {paths[name] || paths.arrow}
+    </svg>
+  );
+}
 
-          {/* Mobile hamburger button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-200/50"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+export function Dashboard({
+  compact = false,
+  restaurant = 'The Green Table',
+  active = 'Overview',
+}: {
+  compact?: boolean;
+  restaurant?: string;
+  active?: string;
+}) {
+  return (
+    <div className={`rm-dashboard ${compact ? 'compact' : ''}`}>
+      <div className="dash-sidebar">
+        <Logo />
+        <div className="dash-restaurant">
+          <span className="restaurant-initial">{restaurant[0] || 'R'}</span>
+          <span>
+            {restaurant}
+            <small>Restaurant workspace</small>
+          </span>
+          <Glyph name="chevron" size={12} />
         </div>
-
-        {/* Mobile dropdown */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white/95 border-b border-gray-200 px-6 py-5 space-y-4 shadow-xl">
-            <nav className="flex flex-col space-y-3">
-              <a
-                href="#features"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-base font-medium text-gray-700 hover:text-[#8C6F56]"
-              >
-                Tính năng
-              </a>
-              <a
-                href="#how-it-works"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-base font-medium text-gray-700 hover:text-[#8C6F56]"
-              >
-                Cách hoạt động
-              </a>
-              <a
-                href="#roles"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-base font-medium text-gray-700 hover:text-[#8C6F56]"
-              >
-                Vai trò
-              </a>
-              <a
-                href="#contact"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-base font-medium text-gray-700 hover:text-[#8C6F56]"
-              >
-                Liên hệ
-              </a>
-            </nav>
-            <div className="pt-4 border-t border-gray-100 flex flex-col gap-2.5">
-              {isLoggedIn ? (
-                <Link
-                  to="/app"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2.5 rounded-xl bg-[#8C6F56] text-white font-semibold"
-                >
-                  Vào ứng dụng
-                </Link>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-2.5 rounded-xl border border-[#8C6F56] text-[#8C6F56] font-semibold"
-                  >
-                    Đăng nhập
-                  </Link>
-                  <Link
-                    to="/register"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-2.5 rounded-xl bg-[#8C6F56] text-white font-semibold shadow-sm"
-                  >
-                    Đăng ký
-                  </Link>
-                </>
-              )}
-            </div>
+        <span className="dash-nav-label">WORKSPACE</span>
+        {['Overview', 'Orders', 'Menu', 'Team', 'Reports'].map((item, i) => (
+          <div
+            key={item}
+            className={`dash-nav-item ${active === item ? 'selected' : ''}`}
+          >
+            <Glyph
+              name={['grid', 'order', 'leaf', 'team', 'chart'][i]}
+              size={15}
+            />
+            {item}
+            {item === 'Orders' && <b>12</b>}
           </div>
-        )}
-      </header>
-
-      {/* 2. HERO SECTION */}
-      <section className="relative overflow-hidden pt-12 pb-20 lg:pt-20 lg:pb-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            {/* Cột trái: Văn bản & Nút */}
-            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#8C6F56]/10 text-[#8C6F56] text-xs font-semibold tracking-wide">
-                <Sparkles size={14} /> Nền tảng quản lý nhà hàng thông minh
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 tracking-tight leading-[1.2]">
-                Quản lý nhà hàng gọn gàng,{' '}
-                <span className="text-[#8C6F56] relative whitespace-nowrap">
-                  ngay trên điện thoại
-                </span>
-              </h1>
-
-              <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Gọi món, thanh toán, theo dõi doanh thu theo thời gian thực. Chủ quán tạo nhà hàng trong 1 phút, nhân viên chỉ cần số điện thoại của chủ để tham gia.
-              </p>
-
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                <Link
-                  to="/register"
-                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-[#8C6F56] text-white text-base font-semibold hover:bg-[#735a44] shadow-lg hover:shadow-xl transition-all text-center flex items-center justify-center gap-2 group"
-                >
-                  Đăng ký miễn phí
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link
-                  to="/login"
-                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-white border border-gray-200 text-gray-700 text-base font-semibold hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-center"
-                >
-                  Đăng nhập
-                </Link>
-              </div>
-
-              {/* Thông số nhanh */}
-              <div className="pt-6 grid grid-cols-3 gap-4 border-t border-gray-200/60 max-w-lg mx-auto lg:mx-0">
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">1 phút</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Khởi tạo quán</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">100%</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Realtime tức thì</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">5 Vai trò</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Phân quyền chi tiết</div>
-                </div>
-              </div>
+        ))}
+        <div className="dash-help">
+          <Glyph name="leaf" size={18} />
+          <strong>A little more growing.</strong>
+          <span>Your restaurant, at its best.</span>
+        </div>
+        <div className="dash-profile">
+          <span>JD</span>
+          <div>
+            Jamie Davis<small>Restaurant owner</small>
+          </div>
+        </div>
+      </div>
+      <div className="dash-body">
+        <div className="dash-top">
+          <span>Your restaurant, at a glance.</span>
+          <span className="dash-status">
+            <i />
+            Live overview
+          </span>
+        </div>
+        <div className="dash-greeting">
+          <div>
+            <h3>
+              {active === 'Orders'
+                ? 'Every order. In harmony.'
+                : active === 'Team'
+                  ? 'Good people. Great service.'
+                  : 'Looking good, Jamie.'}
+            </h3>
+            <p>
+              {active === 'Orders'
+                ? 'From the first ticket to the final plate.'
+                : active === 'Team'
+                  ? 'Your team is ready for a great shift.'
+                  : "Here's what's happening at your restaurant today."}
+            </p>
+          </div>
+          <span>
+            Today <Glyph name="chevron" size={11} />
+          </span>
+        </div>
+        <div className="dash-stats">
+          {(active === 'Team'
+            ? [
+                ['On shift', '8', 'All set for service'],
+                ['Team members', '16', 'Your dream team'],
+                ['Hours this week', '124', 'Right on track'],
+              ]
+            : [
+                ['Total revenue', '$2,846.50', '12.8% vs yesterday'],
+                ['Orders served', '86', '8.2% vs yesterday'],
+                ['Average order', '$33.10', '4.3% vs yesterday'],
+              ]
+          ).map((stat, i) => (
+            <div key={stat[0]}>
+              <span>
+                {stat[0]}
+                <Glyph
+                  name={i === 0 ? 'chart' : i === 1 ? 'order' : 'clock'}
+                  size={13}
+                />
+              </span>
+              <strong>{stat[1]}</strong>
+              <small>↗ {stat[2]}</small>
             </div>
-
-            {/* Cột phải: Mockup màn hình quản lý bàn */}
-            <div className="lg:col-span-5 relative flex justify-center">
-              <div className="relative w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-gray-200/80">
-                {/* Header mô phỏng thanh điều hướng app */}
-                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#8C6F56] text-white flex items-center justify-center text-xs font-bold">
-                      G
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-gray-800">Quán Ngon Galadan</div>
-                      <div className="text-[10px] text-green-600 font-medium">● 8/12 bàn đang phục vụ</div>
-                    </div>
-                  </div>
-                  <span className="text-[11px] bg-[#8C6F56]/10 text-[#8C6F56] px-2 py-0.5 rounded-full font-semibold">
-                    Khu Vực Tầng 1
+          ))}
+        </div>
+        <div className="dash-chart-card">
+          <div className="dash-card-title">
+            <strong>
+              {active === 'Team' ? 'Team hours' : 'Revenue overview'}
+            </strong>
+            <span>
+              This week <Glyph name="chevron" size={10} />
+            </span>
+          </div>
+          <div className="chart-content">
+            <div className="chart-labels">
+              <span>$3k</span>
+              <span>$2k</span>
+              <span>$1k</span>
+              <span>$0</span>
+            </div>
+            <div className="chart-bars">
+              {[43, 62, 51, 75, 59, 94, 78].map((height, i) => (
+                <div key={i}>
+                  <div
+                    className={i === 5 ? 'highlight' : ''}
+                    style={{ height: `${height}%` }}
+                  />
+                  <span>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
                   </span>
                 </div>
-
-                {/* Sơ đồ bàn demo */}
-                <div className="py-4">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-                    Sơ đồ bàn trực quan
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Bàn 1: Trống */}
-                    <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 transition">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-gray-800 text-sm">Bàn 01</span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                        Bàn trống
-                      </span>
-                      <p className="text-[11px] text-gray-400 mt-2">4 chỗ ngồi</p>
-                    </div>
-
-                    {/* Bàn 2: Có khách */}
-                    <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/60 shadow-sm">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-gray-800 text-sm">Bàn 02</span>
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
-                        Có khách
-                      </span>
-                      <div className="mt-2 text-[11px] font-bold text-gray-700 flex justify-between">
-                        <span>3 món</span>
-                        <span className="text-[#8C6F56]">280.000 đ</span>
-                      </div>
-                    </div>
-
-                    {/* Bàn 3: Đã đặt */}
-                    <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-gray-800 text-sm">Bàn 03</span>
-                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">
-                        Đã đặt
-                      </span>
-                      <p className="text-[11px] text-blue-600 mt-2 font-medium">Khách đến 19:30</p>
-                    </div>
-
-                    {/* Bàn 4: Bảo trì */}
-                    <div className="p-3.5 rounded-xl border border-gray-200 bg-gray-50/80">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-gray-700 text-sm">Bàn 04</span>
-                        <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-200 text-gray-700">
-                        Bảo trì
-                      </span>
-                      <p className="text-[11px] text-gray-400 mt-2">Đang lau dọn</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floating Widget 1: Doanh thu */}
-                <div className="mt-2 p-3 bg-gradient-to-r from-[#8C6F56] to-[#735a44] rounded-2xl text-white shadow-md flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] text-amber-200 font-medium">Doanh thu hôm nay</div>
-                    <div className="text-base font-bold">12.450.000 đ</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-flex items-center text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
-                      +18% so hôm qua
-                    </span>
-                  </div>
-                </div>
-
-                {/* Floating Widget 2: Thông báo Bếp */}
-                <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
-                    <ConciergeBell size={15} />
-                  </div>
-                  <div className="text-xs">
-                    <span className="font-bold text-gray-800">Order mới #14 (Bàn 02)</span>
-                    <p className="text-[10px] text-gray-500">2x Bò bít tết sốt tiêu, 1x Nước ép cam</p>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
-      </section>
-
-      {/* 3. TÍNH NĂNG (LƯỚI 3 CỘT) */}
-      <section id="features" className="py-20 bg-white border-y border-gray-200/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
-            <span className="text-xs uppercase font-bold tracking-widest text-[#8C6F56]">
-              Tính năng nổi bật
+        <div className="dash-orders">
+          <div className="dash-card-title">
+            <strong>
+              {active === 'Team' ? 'Today’s team' : 'Recent orders'}
+            </strong>
+            <span>
+              View all <Glyph size={11} />
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900">
-              Mọi thứ bạn cần để vận hành quán trơn tru
-            </h2>
-            <p className="text-gray-600 text-base">
-              Thiết kế trực quan, dễ thao tác trên mọi kích thước màn hình từ điện thoại, máy tính bảng đến máy tính bàn.
-            </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* 1. Quản lý bàn */}
-            <div className="p-7 rounded-2xl bg-[#FAF7F2] border border-[#8C6F56]/15 hover:border-[#8C6F56]/40 hover:shadow-lg transition-all space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                <LayoutGrid size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Quản lý bàn</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Xem trạng thái bàn trống, có khách, đã đặt trước hay bảo trì theo sơ đồ thời gian thực.
-              </p>
+          {(active === 'Team'
+            ? [
+                ['Jamie Davis', 'Floor manager', 'On shift'],
+                ['Alex Morgan', 'Head chef', 'On shift'],
+              ]
+            : [
+                ['#ORD-0086', 'Table 04 · Dine-in', 'Preparing'],
+                ['#ORD-0085', 'Table 12 · Dine-in', 'Completed'],
+              ]
+          ).map((row, i) => (
+            <div className="dash-order-row" key={row[0]}>
+              <span className="order-symbol">
+                <Glyph name={active === 'Team' ? 'team' : 'order'} size={14} />
+              </span>
+              <strong>
+                {row[0]}
+                <small>{row[1]}</small>
+              </strong>
+              <span className={i ? 'status-complete' : 'status-preparing'}>
+                {row[2]}
+              </span>
+              <b>{active === 'Team' ? 'Today' : i ? '$42.50' : '$68.00'}</b>
             </div>
-
-            {/* 2. Gọi món & thanh toán */}
-            <div className="p-7 rounded-2xl bg-[#FAF7F2] border border-[#8C6F56]/15 hover:border-[#8C6F56]/40 hover:shadow-lg transition-all space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                <Receipt size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Gọi món & thanh toán</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Thêm món vào order đang mở cực nhanh, thu ngân chốt bill chính xác và in hóa đơn tức thì.
-              </p>
-            </div>
-
-            {/* 3. Menu món ăn */}
-            <div className="p-7 rounded-2xl bg-[#FAF7F2] border border-[#8C6F56]/15 hover:border-[#8C6F56]/40 hover:shadow-lg transition-all space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                <BookOpen size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Menu thực đơn</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Thêm, sửa, xóa món ăn theo từng danh mục món chính, khai vị, tráng miệng và đồ uống linh hoạt.
-              </p>
-            </div>
-
-            {/* 4. Báo cáo doanh thu */}
-            <div className="p-7 rounded-2xl bg-[#FAF7F2] border border-[#8C6F56]/15 hover:border-[#8C6F56]/40 hover:shadow-lg transition-all space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                <TrendingUp size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Báo cáo doanh thu</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Thống kê doanh thu hôm nay, so sánh biến động với hôm qua và biểu đồ xu hướng 7 ngày gần nhất.
-              </p>
-            </div>
-
-            {/* 5. Nhân viên & phân quyền */}
-            <div className="p-7 rounded-2xl bg-[#FAF7F2] border border-[#8C6F56]/15 hover:border-[#8C6F56]/40 hover:shadow-lg transition-all space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                <ShieldCheck size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Nhân viên & phân quyền</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                5 vai trò chuẩn mực: Chủ quán, Quản lý, Phục vụ, Thu ngân và Bếp với quyền hạn rõ ràng.
-              </p>
-            </div>
-
-            {/* 6. Cập nhật realtime */}
-            <div className="p-7 rounded-2xl bg-[#FAF7F2] border border-[#8C6F56]/15 hover:border-[#8C6F56]/40 hover:shadow-lg transition-all space-y-4 relative">
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-[#8C6F56]/10 text-[#8C6F56] flex items-center justify-center">
-                  <Zap size={24} />
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                  Sắp có
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Cập nhật realtime</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Bếp thấy order mới ngay khi nhân viên phục vụ gửi yêu cầu thông qua công nghệ WebSocket.
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
-      </section>
-
-      {/* 4. CÁCH HOẠT ĐỘNG (3 BƯỚC) */}
-      <section id="how-it-works" className="py-20 bg-[#FAF7F2]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <span className="text-xs uppercase font-bold tracking-widest text-[#8C6F56]">
-              Quy trình đơn giản
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900">
-              Bắt đầu chỉ với 3 bước
-            </h2>
-            <p className="text-gray-600 text-base">
-              Không cần cài đặt phức tạp, không cần thiết bị đắt tiền. Mọi thứ sẵn sàng trong vài phút.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Bước 1 */}
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm relative space-y-4 hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56] text-white font-extrabold text-xl flex items-center justify-center shadow-md">
-                1
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Đăng ký tài khoản</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Đăng ký tài khoản cá nhân nhanh chóng bằng số điện thoại di động và mật khẩu bảo mật.
-              </p>
-            </div>
-
-            {/* Bước 2 */}
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm relative space-y-4 hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56] text-white font-extrabold text-xl flex items-center justify-center shadow-md">
-                2
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Tạo hoặc tham gia quán</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Chủ quán tạo nhà hàng trong 1 phút, hoặc nhân viên chỉ cần nhập số điện thoại của chủ để xin vào quán.
-              </p>
-            </div>
-
-            {/* Bước 3 */}
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm relative space-y-4 hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-xl bg-[#8C6F56] text-white font-extrabold text-xl flex items-center justify-center shadow-md">
-                3
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Duyệt & bắt đầu dùng</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Chủ quán duyệt, gán vai trò cùng ca làm việc thích hợp và cả quán bắt đầu vận hành đồng bộ ngay.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. VAI TRÒ (5 THẺ) */}
-      <section id="roles" className="py-20 bg-white border-t border-gray-200/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <span className="text-xs uppercase font-bold tracking-widest text-[#8C6F56]">
-              Phân quyền thông minh
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900">
-              5 vai trò cho mọi vị trí trong nhà hàng
-            </h2>
-            <p className="text-gray-600 text-base">
-              Mỗi nhân sự chỉ thấy và thao tác đúng các chức năng thuộc phạm vi công việc của mình.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-            {/* Chủ cửa hàng */}
-            <div className="bg-[#FAF7F2] p-6 rounded-2xl border border-[#8C6F56]/20 flex flex-col justify-between hover:shadow-md transition">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-[#8C6F56] text-white flex items-center justify-center mb-4 shadow">
-                  <Crown size={20} />
-                </div>
-                <h4 className="text-base font-bold text-gray-900 mb-2">Chủ cửa hàng</h4>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Toàn quyền quản lý nhà hàng, cấu hình chung và bổ nhiệm Quản lý.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-[#8C6F56]/15 text-[11px] font-semibold text-[#8C6F56]">
-                ★ Toàn quyền hệ thống
-              </div>
-            </div>
-
-            {/* Quản lý */}
-            <div className="bg-[#FAF7F2] p-6 rounded-2xl border border-gray-200 flex flex-col justify-between hover:shadow-md transition">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center mb-4 shadow">
-                  <UserCog size={20} />
-                </div>
-                <h4 className="text-base font-bold text-gray-900 mb-2">Quản lý</h4>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Quản lý danh sách nhân viên, menu thực đơn, cấu hình sơ đồ bàn và theo dõi báo cáo.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-200 text-[11px] font-semibold text-amber-800">
-                Nhân viên • Menu • Báo cáo
-              </div>
-            </div>
-
-            {/* Phục vụ */}
-            <div className="bg-[#FAF7F2] p-6 rounded-2xl border border-gray-200 flex flex-col justify-between hover:shadow-md transition">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center mb-4 shadow">
-                  <ConciergeBell size={20} />
-                </div>
-                <h4 className="text-base font-bold text-gray-900 mb-2">Phục vụ</h4>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Xem tình trạng bàn, tạo order món cho khách và bổ sung món vào order đang mở.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-200 text-[11px] font-semibold text-emerald-800">
-                Sơ đồ bàn • Tạo order
-              </div>
-            </div>
-
-            {/* Thu ngân */}
-            <div className="bg-[#FAF7F2] p-6 rounded-2xl border border-gray-200 flex flex-col justify-between hover:shadow-md transition">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center mb-4 shadow">
-                  <CreditCard size={20} />
-                </div>
-                <h4 className="text-base font-bold text-gray-900 mb-2">Thu ngân</h4>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Kiểm tra order, chốt bill thanh toán, áp dụng chiết khấu và xuất hóa đơn cho khách.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-200 text-[11px] font-semibold text-blue-800">
-                Chốt bill • Thanh toán
-              </div>
-            </div>
-
-            {/* Bếp */}
-            <div className="bg-[#FAF7F2] p-6 rounded-2xl border border-gray-200 flex flex-col justify-between hover:shadow-md transition">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center mb-4 shadow">
-                  <ChefHat size={20} />
-                </div>
-                <h4 className="text-base font-bold text-gray-900 mb-2">Bếp</h4>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Xem danh sách món cần chế biến theo thứ tự gọi món và cập nhật trạng thái ra món.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-200 text-[11px] font-semibold text-orange-800">
-                Tiếp nhận order chế biến
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. KÊU GỌI HÀNH ĐỘNG CUỐI TRANG (CTA) */}
-      <section className="py-20 bg-gradient-to-br from-[#8C6F56] to-[#6d543e] text-white text-center">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Sẵn sàng bắt đầu?
-          </h2>
-          <p className="text-base sm:text-lg text-amber-100 max-w-xl mx-auto leading-relaxed">
-            Trải nghiệm phương thức quản lý nhà hàng thông minh, tiết kiệm thời gian và nâng cao doanh thu ngay hôm nay.
-          </p>
-          <div className="pt-2">
-            <Link
-              to="/register"
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-white text-[#8C6F56] font-bold text-base hover:bg-amber-50 shadow-xl transition-all"
-            >
-              Đăng ký ngay <ArrowRight size={18} />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. FOOTER */}
-      <footer id="contact" className="bg-[#1f1d1b] text-gray-400 py-14">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-            {/* Cột 1: Thông tin thương hiệu */}
-            <div className="space-y-4 md:col-span-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#8C6F56] text-white flex items-center justify-center font-bold">
-                  <UtensilsCrossed size={20} />
-                </div>
-                <span className="text-xl font-bold text-white tracking-tight">Galadan</span>
-              </div>
-              <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-                Giải pháp phần mềm quản lý nhà hàng toàn diện, tối ưu hóa quy trình gọi món, kiểm soát bàn và báo cáo doanh thu theo thời gian thực.
-              </p>
-            </div>
-
-            {/* Cột 2: Điều hướng */}
-            <div>
-              <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
-                Điều hướng
-              </h4>
-              <ul className="space-y-2.5 text-sm">
-                <li><a href="#features" className="hover:text-white transition">Tính năng</a></li>
-                <li><a href="#how-it-works" className="hover:text-white transition">Cách hoạt động</a></li>
-                <li><a href="#roles" className="hover:text-white transition">Phân quyền vai trò</a></li>
-                <li><Link to="/login" className="hover:text-white transition">Đăng nhập</Link></li>
-                <li><Link to="/register" className="hover:text-white transition">Đăng ký tài khoản</Link></li>
-              </ul>
-            </div>
-
-            {/* Cột 3: Liên hệ */}
-            <div>
-              <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
-                Liên hệ hỗ trợ
-              </h4>
-              <ul className="space-y-2.5 text-sm">
-                <li className="flex items-center gap-2">
-                  <Mail size={16} className="text-[#8C6F56]" />
-                  <span>support@galadan.vn</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Phone size={16} className="text-[#8C6F56]" />
-                  <span>0901 234 567</span>
-                </li>
-                <li className="text-xs text-gray-500 pt-2">
-                  Hỗ trợ kỹ thuật 24/7 cho chủ nhà hàng
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-gray-800 text-center text-xs text-gray-500 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              © 2026 Galadan. Bản quyền thuộc về Restaurant Management Platform.
-            </div>
-            <div className="flex gap-6">
-              <span className="hover:text-gray-300 cursor-pointer">Điều khoản dịch vụ</span>
-              <span className="hover:text-gray-300 cursor-pointer">Chính sách bảo mật</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
   );
-};
+}
 
-export default LandingPage;
+const featureData = [
+  {
+    icon: 'order',
+    title: 'Every order, in harmony.',
+    text: 'From the first ticket to the last table, keep orders flowing and your kitchen in sync.',
+    tag: 'ORDER MANAGEMENT',
+  },
+  {
+    icon: 'team',
+    title: 'Good people. Great shifts.',
+    text: 'Bring your team together with clear schedules, shared tasks, and less back-and-forth.',
+    tag: 'TEAM & OPERATIONS',
+  },
+  {
+    icon: 'chart',
+    title: 'Know more. Grow better.',
+    text: 'Turn everyday numbers into a clearer picture of what’s working for your restaurant.',
+    tag: 'INSIGHTS & REPORTS',
+  },
+];
+
+export default function LandingPage() {
+  const navigate = useNavigate();
+  const isLoggedIn = !!session.token;
+
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [demo, setDemo] = useState(false);
+  const [demoTab, setDemoTab] = useState('Overview');
+  const [annual, setAnnual] = useState(true);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (!demo) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDemo(false);
+    };
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener('keydown', escape);
+    };
+  }, [demo]);
+
+  const handleStart = () => {
+    navigate('/onboarding');
+  };
+
+  return (
+    <div className="rm-site">
+      {/* Announcement Bar */}
+      <div className="rm-announcement">
+        <span className="announcement-dot" /> A fresh way to run your restaurant.{' '}
+        <a href="#features">
+          Meet your new helping hand <Glyph size={13} />
+        </a>
+      </div>
+
+      {/* Header */}
+      <header className="rm-header">
+        <Link to="/" aria-label="ResMana home">
+          <Logo />
+        </Link>
+        <nav
+          className={mobileMenu ? 'rm-navigation open' : 'rm-navigation'}
+          aria-label="Main navigation"
+        >
+          <a href="#features" onClick={() => setMobileMenu(false)}>
+            Why ResMana <Glyph name="chevron" size={13} />
+          </a>
+          <a href="#how-it-works" onClick={() => setMobileMenu(false)}>
+            How it works
+          </a>
+          <a href="#pricing" onClick={() => setMobileMenu(false)}>
+            Pricing
+          </a>
+          <a href="#faq" onClick={() => setMobileMenu(false)}>
+            FAQs
+          </a>
+          {isLoggedIn && (
+            <Link to="/app" onClick={() => setMobileMenu(false)}>
+              Workspace
+            </Link>
+          )}
+        </nav>
+        <div className="rm-header-actions">
+          <button className="rm-text-button" onClick={() => setDemo(true)}>
+            Explore the app <Glyph size={15} />
+          </button>
+
+          {isLoggedIn ? (
+            <button
+              className="rm-button small"
+              onClick={() => navigate('/app')}
+            >
+              Go to Workspace <Glyph size={15} />
+            </button>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="rm-text-button"
+                style={{ textDecoration: 'none' }}
+              >
+                Sign in
+              </Link>
+              <button className="rm-button small" onClick={handleStart}>
+                Get started <Glyph size={15} />
+              </button>
+            </>
+          )}
+
+          <button
+            className="rm-menu-button"
+            onClick={() => setMobileMenu(!mobileMenu)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenu}
+          >
+            <Glyph name={mobileMenu ? 'close' : 'menu'} />
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="rm-main">
+        {/* Hero Section */}
+        <section className="rm-hero">
+          <div className="hero-copy">
+            <div className="rm-pill">
+              <Glyph name="leaf" size={13} /> A LITTLE LESS CHAOS. A LOT MORE
+              POSSIBLE.
+            </div>
+            <h1>
+              Good food.
+              <br />
+              Great service.
+              <br />
+              <span>Less busywork.</span>
+              <svg
+                className="hero-underline"
+                viewBox="0 0 380 16"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 11C95-1 260-2 375 7M31 15c104-8 225-9 316-4"
+                  stroke="#C7F4A4"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </h1>
+            <p>
+              Your restaurant has a lot of moving parts. Bring them all together
+              with one simple platform — and get back to the hospitality you
+              love.
+            </p>
+            <div className="hero-ctas">
+              <button className="rm-button" onClick={handleStart}>
+                Let’s grow your restaurant <Glyph size={17} />
+              </button>
+              <button className="rm-video-button" onClick={() => setDemo(true)}>
+                <span>
+                  <Glyph name="play" size={13} />
+                </span>
+                Take a quick tour
+              </button>
+            </div>
+            <div className="hero-reassurance">
+              <span>
+                <Glyph name="check" size={13} />
+                Explore at your own pace
+              </span>
+              <span>
+                <Glyph name="check" size={13} />
+                No credit card needed
+              </span>
+            </div>
+            <div className="hero-social">
+              <div className="social-avatars">
+                <span>JL</span>
+                <span>AM</span>
+                <span>SK</span>
+                <span>RD</span>
+              </div>
+              <div>
+                <div className="social-stars">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Glyph key={i} name="star" size={11} />
+                  ))}
+                  <strong>Built for people who care.</strong>
+                </div>
+                <p>From neighborhood cafés to the next big thing.</p>
+              </div>
+            </div>
+          </div>
+          <div className="hero-visual">
+            <div className="visual-grid" />
+            <div className="visual-sun">
+              <Glyph name="leaf" size={32} />
+            </div>
+            <div className="hero-dash-wrap">
+              <Dashboard compact />
+            </div>
+            <div className="floating-order">
+              <span className="floating-check">
+                <Glyph name="check" size={19} />
+              </span>
+              <div>
+                <strong>Another smooth service.</strong>
+                <span>Kitchen happy. Guests happier.</span>
+              </div>
+              <span className="floating-dot" />
+            </div>
+            <div className="floating-growth">
+              <div>
+                <span>A little progress, every day</span>
+                <Glyph name="chart" size={17} />
+              </div>
+              <strong>
+                More room to grow<span>↗</span>
+              </strong>
+              <div className="growth-mini-bars">
+                {[20, 35, 29, 49, 43, 62, 72, 65, 88, 100].map((height, i) => (
+                  <span key={i} style={{ height: `${height}%` }} />
+                ))}
+              </div>
+            </div>
+            <div className="visual-caption">
+              <span />
+              YOUR WHOLE RESTAURANT. ONE HAPPY PLACE.
+            </div>
+          </div>
+        </section>
+
+        {/* Trust Strip */}
+        <section className="rm-trust">
+          <p>
+            FOR THE EARLY RISERS, THE LATE CLOSERS, AND EVERYONE IN BETWEEN.
+          </p>
+          <div>
+            <span className="partner-serif">
+              the green table<span className="partner-leaf">↗</span>
+            </span>
+            <span className="partner-serif italic">
+              Sunday
+              <br />
+              <small>coffee & company</small>
+            </span>
+            <span className="partner-mono">FORK & FIELD</span>
+            <span className="partner-serif">
+              Gather<span className="partner-small">KITCHEN & BAR</span>
+            </span>
+            <span className="partner-serif italic">
+              little olive
+              <span className="partner-small">GOOD FOOD. GOOD COMPANY.</span>
+            </span>
+          </div>
+          <small>Imagined restaurants. Real possibilities.</small>
+        </section>
+
+        {/* Features */}
+        <section className="rm-features rm-section" id="features">
+          <div className="rm-section-heading">
+            <span className="rm-eyebrow">LESS JUGGLING. MORE JOY.</span>
+            <h2>
+              A full plate is good.
+              <br />
+              An overflowing to-do list? Not so much.
+            </h2>
+            <p>
+              Meet the helping hand that connects your front of house,
+              <br className="desktop-break" /> back of house, and everything in
+              between.
+            </p>
+          </div>
+          <div className="rm-feature-grid">
+            {featureData.map((feature, i) => (
+              <article className="rm-feature-card" key={feature.title}>
+                <span className="feature-icon">
+                  <Glyph name={feature.icon} size={24} />
+                </span>
+                <span className="feature-number">0{i + 1}</span>
+                <div className="rm-eyebrow">{feature.tag}</div>
+                <h3>{feature.title}</h3>
+                <p>{feature.text}</p>
+                <button
+                  onClick={() => {
+                    setDemoTab(['Orders', 'Team', 'Overview'][i]);
+                    setDemo(true);
+                  }}
+                >
+                  Take a closer look <Glyph size={15} />
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* Story / How it works */}
+        <section className="rm-story rm-section" id="how-it-works">
+          <div className="story-image">
+            <img
+              src={restaurantPhoto}
+              alt="A lively neighborhood restaurant filled with guests and warm natural light"
+              loading="lazy"
+            />
+            <div className="story-photo-label">
+              <Glyph name="leaf" size={17} />
+              More moments like this.
+            </div>
+            <a
+              className="photo-credit"
+              href="https://unsplash.com/@kayleighharrington"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Photo: Kayleigh Harrington / Unsplash
+            </a>
+          </div>
+          <div className="story-copy">
+            <span className="rm-eyebrow">BUILT AROUND YOUR WORLD</span>
+            <h2>
+              Less time behind
+              <br />a screen.
+              <br />
+              <span>More time on the floor.</span>
+            </h2>
+            <p>
+              You didn’t open a restaurant to manage spreadsheets. ResMana helps
+              make the everyday easier, one small thing at a time.
+            </p>
+            <ol>
+              {[
+                [
+                  'Make yourself at home',
+                  'Tell us a little about your restaurant.',
+                ],
+                [
+                  'Find your rhythm',
+                  'Choose the tools that fit the way you work.',
+                ],
+                [
+                  'Make room for the good stuff',
+                  'Spend less time juggling, more time serving.',
+                ],
+              ].map((step, i) => (
+                <li key={step[0]}>
+                  <span>0{i + 1}</span>
+                  <div>
+                    <strong>{step[0]}</strong>
+                    <p>{step[1]}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <button className="rm-text-button" onClick={handleStart}>
+              Let’s make it yours <Glyph size={17} />
+            </button>
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section className="rm-pricing rm-section" id="pricing">
+          <div className="rm-section-heading">
+            <span className="rm-eyebrow">SIMPLE PLANS. ROOM TO GROW.</span>
+            <h2>A good fit for your next chapter.</h2>
+            <p>
+              Transparent example pricing, built around the size of your
+              ambition.
+            </p>
+            <div className="billing-toggle">
+              <button
+                className={!annual ? 'active' : ''}
+                onClick={() => setAnnual(false)}
+                aria-pressed={!annual}
+              >
+                Monthly
+              </button>
+              <button
+                className={annual ? 'active' : ''}
+                onClick={() => setAnnual(true)}
+                aria-pressed={annual}
+              >
+                Yearly <span>Save 20%</span>
+              </button>
+            </div>
+          </div>
+          <div className="pricing-grid">
+            {[
+              {
+                name: 'Essentials',
+                price: annual ? 39 : 49,
+                text: 'A fresh start for independent restaurants.',
+                features: [
+                  'Orders & menu management',
+                  'Daily performance insights',
+                  'Up to 5 team members',
+                  'One restaurant location',
+                ],
+              },
+              {
+                name: 'Growth',
+                price: annual ? 79 : 99,
+                text: 'A little more power. A lot more possibility.',
+                features: [
+                  'Everything in Essentials',
+                  'Advanced reports & insights',
+                  'Unlimited team members',
+                  'Team scheduling & operations',
+                ],
+              },
+            ].map((plan, i) => (
+              <article
+                className={`pricing-card ${i ? 'featured' : ''}`}
+                key={plan.name}
+              >
+                {i === 1 && (
+                  <div className="popular-label">
+                    <Glyph name="leaf" size={13} />
+                    MADE FOR YOUR NEXT CHAPTER
+                  </div>
+                )}
+                <h3>{plan.name}</h3>
+                <p>{plan.text}</p>
+                <div className="plan-price">
+                  ${plan.price}
+                  <span>/ month</span>
+                </div>
+                <small>
+                  {annual
+                    ? `Billed yearly · $${plan.price * 12}/year`
+                    : 'Billed monthly · No annual commitment'}
+                </small>
+                <button
+                  className={`rm-button ${i ? '' : 'outline'}`}
+                  onClick={handleStart}
+                >
+                  Explore {plan.name}
+                  <Glyph size={16} />
+                </button>
+                <ul>
+                  {plan.features.map((feature) => (
+                    <li key={feature}>
+                      <Glyph name="check" size={15} />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <p className="pricing-note">
+            Preview plans only. Full access is unlocked for your restaurant workspace.
+          </p>
+        </section>
+
+        {/* FAQs */}
+        <section className="rm-faq rm-section" id="faq">
+          <div>
+            <span className="rm-eyebrow">
+              A FEW THINGS YOU MIGHT BE WONDERING
+            </span>
+            <h2>
+              Good questions.
+              <br />
+              Straight answers.
+            </h2>
+            <p>Getting to know your next helping hand.</p>
+          </div>
+          <div>
+            {[
+              [
+                'What is ResMana?',
+                'ResMana is a modern restaurant management platform designed with hospitality at heart. It connects tables, orders, kitchen workflows, team scheduling, and revenue analytics into one calm, unified workspace.',
+              ],
+              [
+                'Can I try it before setting up?',
+                'Absolutely! Click "Explore the app" or "Take a quick tour" to view the live interactive preview, or start right away through the guided onboarding.',
+              ],
+              [
+                'Is it suitable for my restaurant type?',
+                'Yes. ResMana is tailored for independent diners, cafés, bistros, bakeries, lounges, and multi-station restaurants. You can customize table grids, categories, and roles seamlessly.',
+              ],
+              [
+                'Does it support real-time kitchen updates?',
+                'Yes! ResMana is integrated with WebSocket real-time push notifications. When orders or tables update, your kitchen and front-of-house staff see status changes instantaneously.',
+              ],
+            ].map(([question, answer], i) => (
+              <div className="faq-item" key={question}>
+                <button
+                  aria-expanded={openFaq === i}
+                  aria-controls={`faq-${i}`}
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                >
+                  {question}
+                  <span>{openFaq === i ? '−' : '+'}</span>
+                </button>
+                {openFaq === i && <p id={`faq-${i}`}>{answer}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Bottom CTA */}
+        <section className="rm-bottom-cta">
+          <div className="cta-decoration">
+            <Glyph name="leaf" size={110} />
+          </div>
+          <span className="rm-eyebrow">MORE HOSPITALITY. LESS HASSLE.</span>
+          <h2>
+            Make room for
+            <br />
+            what you love.
+          </h2>
+          <p>
+            A smoother service. A happier team. A little more breathing room.
+          </p>
+          <button className="rm-button" onClick={handleStart}>
+            Your next chapter starts here <Glyph size={18} />
+          </button>
+          <span className="cta-footnote">
+            No credit card. No pressure. Just possibilities.
+          </span>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="rm-footer">
+        <div>
+          <Link to="/" aria-label="ResMana home">
+            <Logo />
+          </Link>
+          <p>Less managing. More serving.</p>
+        </div>
+        <div className="footer-links">
+          <a href="#features">Why ResMana</a>
+          <a href="#pricing">Pricing</a>
+          <Link to="/brand" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            Brand guidelines <Glyph size={12} />
+          </Link>
+        </div>
+        <div className="footer-end">
+          <span>© {new Date().getFullYear()} ResMana. Thoughtfully made.</span>
+          <span>
+            <span className="announcement-dot" />
+            Hospitality at heart.
+          </span>
+        </div>
+      </footer>
+
+      {/* Product Tour Modal */}
+      {demo && (
+        <div
+          className="demo-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setDemo(false);
+          }}
+        >
+          <section
+            className="demo-dialog"
+            role="dialog"
+            aria-modal="true"
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return;
+              const controls =
+                event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  'button',
+                );
+              const first = controls[0];
+              const last = controls[controls.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last?.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first?.focus();
+              }
+            }}
+            aria-labelledby="demo-title"
+          >
+            <div className="demo-dialog-header">
+              <div>
+                <span className="rm-eyebrow">A LITTLE LOOK AROUND</span>
+                <h2 id="demo-title">Your restaurant, all together.</h2>
+              </div>
+              <button
+                onClick={() => setDemo(false)}
+                autoFocus
+                aria-label="Close product tour"
+              >
+                <Glyph name="close" />
+              </button>
+            </div>
+            <div className="demo-tabs" role="tablist" aria-label="Product tour">
+              {['Overview', 'Orders', 'Team'].map((tab) => (
+                <button
+                  role="tab"
+                  aria-selected={demoTab === tab}
+                  key={tab}
+                  onClick={() => setDemoTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <Dashboard active={demoTab} />
+            <div className="demo-bottom">
+              <span>Sample dashboard · Illustrative data</span>
+              <button className="rm-button small" onClick={handleStart}>
+                Make it yours <Glyph size={15} />
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}

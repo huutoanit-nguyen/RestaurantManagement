@@ -12,8 +12,10 @@ import web.com.exception.ErrorResponse;
 import web.com.model.TableEntity;
 import web.com.security.Roles;
 import web.com.security.TenantContext;
+import web.com.websocket.WebSocketBroadcaster;
 
 import java.util.List;
+import java.util.Map;
 
 @Path("/api/tables")
 @ApplicationScoped
@@ -22,6 +24,7 @@ import java.util.List;
 public class TableResource {
 
     @Inject TenantContext tenant;
+    @Inject WebSocketBroadcaster broadcaster;
 
     // ==================== GET ALL ====================
     @GET
@@ -97,6 +100,7 @@ public class TableResource {
         }
 
         table.persist();
+        broadcaster.broadcast(rid, "TABLE_CREATED", table);
         return Response.status(Response.Status.CREATED).entity(table).build();
     }
 
@@ -145,6 +149,7 @@ public class TableResource {
         if (updated.status != null)
             table.status = updated.status.toUpperCase();
 
+        broadcaster.broadcast(rid, "TABLE_UPDATED", table);
         return Response.ok(table).build();
     }
 
@@ -175,6 +180,7 @@ public class TableResource {
         }
 
         table.status = status.toUpperCase();
+        broadcaster.broadcast(tenant.restaurantId(), "TABLE_UPDATED", table);
         return Response.ok(table).build();
     }
 
@@ -199,6 +205,7 @@ public class TableResource {
         }
 
         table.delete();
+        broadcaster.broadcast(tenant.restaurantId(), "TABLE_DELETED", Map.of("id", id));
         return Response.noContent().build();
     }
 }

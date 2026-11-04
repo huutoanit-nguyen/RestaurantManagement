@@ -6,13 +6,13 @@ INSERT INTO account (id, full_name, phone, password) VALUES
 
 -- 2. Nhà hàng mẫu
 INSERT INTO restaurant (id, name, owner_id, created_at) VALUES 
-(1, 'Quán Ngon Galadan', 1, NOW());
+(1, 'Quán Ngon ResMana', 1, NOW());
 
 -- 3. Membership Chủ cửa hàng
 INSERT INTO membership (id, account_id, restaurant_id, role, shift, status) VALUES 
 (1, 1, 1, 'Chủ cửa hàng', 'Tất cả', 'ACTIVE');
 
--- 4. Bàn ăn mẫu của Quán Ngon Galadan
+-- 4. Bàn ăn mẫu của Quán Ngon ResMana
 INSERT INTO restaurant_table (restaurant_id, table_number, capacity, location, status) VALUES 
 (1, 1, 4, 'Tầng 1', 'AVAILABLE'),
 (1, 2, 4, 'Tầng 1', 'AVAILABLE'),
@@ -20,7 +20,7 @@ INSERT INTO restaurant_table (restaurant_id, table_number, capacity, location, s
 (1, 4, 8, 'Phòng VIP', 'AVAILABLE'),
 (1, 5, 2, 'Sân vườn', 'AVAILABLE');
 
--- 5. Thực đơn mẫu của Quán Ngon Galadan
+-- 5. Thực đơn mẫu của Quán Ngon ResMana
 INSERT INTO menuitem (id, restaurant_id, category, name, price) VALUES 
 (1, 1, 'Khai vị', 'Súp Bào Ngư', 150000),
 (2, 1, 'Khai vị', 'Salad Ức Gà', 85000),

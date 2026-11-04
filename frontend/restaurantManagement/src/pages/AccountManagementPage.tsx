@@ -71,14 +71,14 @@ const AccountManagementPage: React.FC = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto bg-[#FAF7F2] p-6">
+    <div className="flex-1 overflow-y-auto bg-[#F7F8F5] p-6">
       <div className="max-w-lg mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Shield size={22} className="text-[#8C6F56]" />
+          <Shield size={22} className="text-[#52735B]" />
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Bảo mật</h1>
+            <h1 className="text-xl font-bold text-[#202923]">Bảo mật</h1>
             <p className="text-xs text-gray-400">Thay đổi mật khẩu tài khoản của bạn</p>
           </div>
         </div>
@@ -86,7 +86,7 @@ const AccountManagementPage: React.FC = () => {
         {/* ── Đổi mật khẩu ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
           <p className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <KeyRound size={15} className="text-[#8C6F56]" />
+            <KeyRound size={15} className="text-[#52735B]" />
             Đổi mật khẩu
           </p>
 
@@ -107,7 +107,7 @@ const AccountManagementPage: React.FC = () => {
                 value={oldPass}
                 autoComplete="current-password"
                 onChange={e => { setOldPass(e.target.value); setPassError(null); }}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
               />
               <button type="button" onClick={() => setShowOld(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -126,7 +126,7 @@ const AccountManagementPage: React.FC = () => {
                 value={newPass}
                 autoComplete="new-password"
                 onChange={e => { setNewPass(e.target.value); setPassError(null); }}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
               />
               <button type="button" onClick={() => setShowNew(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -145,7 +145,7 @@ const AccountManagementPage: React.FC = () => {
                 value={confirmPass}
                 autoComplete="new-password"
                 onChange={e => { setConfirmPass(e.target.value); setPassError(null); }}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#FAF7F2] focus:bg-white focus:ring-1 focus:ring-[#8C6F56] outline-none transition"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm bg-[#F7F8F5] focus:bg-white focus:ring-1 focus:ring-[#52735B] outline-none transition"
               />
               <button type="button" onClick={() => setShowConf(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -163,7 +163,7 @@ const AccountManagementPage: React.FC = () => {
           <button
             onClick={handleChange}
             disabled={saving}
-            className="w-full py-3 bg-[#8C6F56] text-white rounded-xl font-bold text-sm hover:bg-[#735a44] transition flex justify-center items-center gap-2 disabled:opacity-60 mt-2"
+            className="w-full py-3 bg-[#202923] text-[#C7F4A4] rounded-xl font-bold text-sm hover:bg-[#52735B] hover:text-white transition flex justify-center items-center gap-2 disabled:opacity-60 mt-2 cursor-pointer"
           >
             {saving && <Loader2 size={15} className="animate-spin" />}
             {saving ? 'Đang lưu...' : 'Cập nhật mật khẩu'}
@@ -173,13 +173,13 @@ const AccountManagementPage: React.FC = () => {
         {/* ── Lịch sử đổi mật khẩu ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <p className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
-            <Clock size={15} className="text-[#8C6F56]" />
+            <Clock size={15} className="text-[#52735B]" />
             Lịch sử đổi mật khẩu
           </p>
 
           {logsLoading ? (
             <div className="flex justify-center py-6">
-              <Loader2 size={20} className="animate-spin text-[#8C6F56]" />
+              <Loader2 size={20} className="animate-spin text-[#52735B]" />
             </div>
           ) : logs.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">Chưa có lịch sử đổi mật khẩu</p>

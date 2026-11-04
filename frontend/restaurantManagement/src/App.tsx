@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChooseRestaurantPage from './pages/ChooseRestaurantPage';
 import OnboardingPage from './pages/OnboardingPage';
+import BrandWorkspacePage from './pages/BrandWorkspacePage';
 
 // Pages – App Shell
 import MenuPage from './pages/MenuPage';
@@ -22,8 +23,9 @@ import { ProtectedRoute, PublicOnlyRoute } from './layout/components/ProtectedRo
 export default function App() {
   return (
     <Routes>
-      {/* ── Trang Landing (public, mọi người xem được) ── */}
+      {/* ── Trang Landing & Brand (public, mọi người xem được) ── */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/brand" element={<BrandWorkspacePage />} />
 
       {/* ── Trang chỉ dành cho khách chưa đăng nhập ── */}
       <Route
@@ -43,15 +45,8 @@ export default function App() {
         }
       />
 
-      {/* ── Trang chỉ dành cho người đã đăng nhập (nhưng chưa chọn nhà hàng) ── */}
-      <Route
-        path="/onboarding"
-        element={
-          <ProtectedRoute requireRestaurant={false}>
-            <OnboardingPage />
-          </ProtectedRoute>
-        }
-      />
+      {/* ── Trang Onboarding (khám phá hoặc khởi tạo nhà hàng) ── */}
+      <Route path="/onboarding" element={<OnboardingPage />} />
       <Route
         path="/choose-restaurant"
         element={

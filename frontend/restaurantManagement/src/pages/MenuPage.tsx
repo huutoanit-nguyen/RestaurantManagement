@@ -152,15 +152,15 @@ const MenuPage: React.FC = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 p-4 md:p-6 font-[ui-sans-serif,system-ui,sans-serif]  bg-[#FAF7F2] border-l border-gray-200">
+    <div className="flex-1 p-4 md:p-6 bg-[#F7F8F5] border-l border-gray-200">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Thực đơn</h2>
+          <h2 className="text-2xl font-bold text-[#202923]">Thực đơn</h2>
           <p className="text-gray-400 text-sm">Quản lý danh sách món ăn nhà hàng</p>
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-[#8C6F56] text-white rounded-xl text-sm font-medium hover:bg-[#735a44] transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-[#202923] text-[#C7F4A4] rounded-xl text-sm font-bold hover:bg-[#52735B] hover:text-white transition-all shadow-sm cursor-pointer"
         >
           <Plus size={16} />
           Thêm món
@@ -175,14 +175,14 @@ const MenuPage: React.FC = () => {
           placeholder="Tìm kiếm món ăn..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-[#8C6F56] transition"
+          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-[#52735B] transition"
         />
       </div>
 
       {/* Loading / Error states */}
       {loading && (
         <div className="flex items-center gap-2 text-gray-400 text-sm py-10 justify-center">
-          <Loader2 size={16} className="animate-spin" /> Đang tải thực đơn...
+          <Loader2 size={16} className="animate-spin text-[#52735B]" /> Đang tải thực đơn...
         </div>
       )}
 
@@ -202,8 +202,8 @@ const MenuPage: React.FC = () => {
             return (
               <div key={cat}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-1 h-4 bg-[#8C6F56] rounded-full" />
-                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">{cat}</h3>
+                  <div className="w-1 h-4 bg-[#52735B] rounded-full" />
+                  <h3 className="text-sm font-bold text-[#202923] uppercase tracking-wider">{cat}</h3>
                   <span className="text-xs text-gray-400">({rows.length})</span>
                 </div>
 
@@ -229,8 +229,8 @@ const MenuPage: React.FC = () => {
                         <span className="text-xs text-gray-500 text-center bg-gray-100 py-1 rounded-full">{dish.category}</span>
                         <span className="text-sm text-gray-600 font-semibold">{dish.price.toLocaleString()}đ</span>
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => openEdit(dish)} className="p-1.5 text-gray-400 hover:text-[#8C6F56] transition"><Pencil size={14} /></button>
-                          <button onClick={() => setDeleteTarget(dish)} className="p-1.5 text-gray-400 hover:text-red-500 transition"><Trash2 size={14} /></button>
+                          <button onClick={() => openEdit(dish)} className="p-1.5 text-gray-400 hover:text-[#52735B] transition cursor-pointer"><Pencil size={14} /></button>
+                          <button onClick={() => setDeleteTarget(dish)} className="p-1.5 text-gray-400 hover:text-red-500 transition cursor-pointer"><Trash2 size={14} /></button>
                         </div>
                       </div>
                     ))
@@ -248,14 +248,14 @@ const MenuPage: React.FC = () => {
           <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeModal} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-5">
-              <h3 className="text-lg font-bold text-gray-800">{editTarget ? 'Sửa món ăn' : 'Thêm món mới'}</h3>
+              <h3 className="text-lg font-bold text-[#202923]">{editTarget ? 'Sửa món ăn' : 'Thêm món mới'}</h3>
               <X size={20} className="text-gray-400 cursor-pointer hover:text-gray-600" onClick={closeModal} />
             </div>
             <div className="space-y-4">
               <input
                 type="text" placeholder="Tên món" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-[#8C6F56] outline-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-[#52735B] outline-none"
               />
               <select
                 value={form.category}
@@ -273,7 +273,7 @@ const MenuPage: React.FC = () => {
             </div>
             <button
               onClick={handleSave} disabled={saving}
-              className="w-full mt-6 py-3 bg-[#8C6F56] text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity flex justify-center items-center gap-2"
+              className="w-full mt-6 py-3 bg-[#202923] text-[#C7F4A4] rounded-xl font-bold text-sm hover:bg-[#52735B] hover:text-white transition-all flex justify-center items-center gap-2 cursor-pointer"
             >
               {saving && <Loader2 size={16} className="animate-spin" />}
               {editTarget ? 'Cập nhật' : 'Thêm vào thực đơn'}

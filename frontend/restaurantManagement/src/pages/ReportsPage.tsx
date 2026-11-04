@@ -56,7 +56,7 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, colorClass = 'text-gray-900' }) => (
-  <div className="bg-[#FAF7F2] rounded-2xl border border-[#8C6F56]/15 p-5 flex flex-col justify-between">
+  <div className="bg-[#F7F8F5] rounded-2xl border border-[#202923]/10 p-5 flex flex-col justify-between">
     <p className="text-sm font-semibold text-gray-500 mb-2">{label}</p>
     <p className={`text-2xl font-bold tracking-tight ${colorClass}`}>{value}</p>
   </div>
@@ -68,7 +68,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-4 py-3 text-sm">
       <p className="font-semibold text-gray-700 mb-1">{label}</p>
-      <p className="text-[#8C6F56] font-bold">
+      <p className="text-[#52735B] font-bold">
         {payload[0].value.toLocaleString('vi-VN')}đ
       </p>
     </div>
@@ -139,7 +139,7 @@ const ReportsPage: React.FC = () => {
             <StatCard
               label="Doanh thu hôm nay"
               value={`${summary.revenueToday.toLocaleString('vi-VN')}đ`}
-              colorClass="text-[#8C6F56]"
+              colorClass="text-[#52735B]"
             />
             <StatCard
               label="Số đơn hàng"
@@ -175,8 +175,8 @@ const ReportsPage: React.FC = () => {
                   tickFormatter={v => `${(v / 1000000).toFixed(1)}M`}
                   width={44}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F9F5F2' }} />
-                <Bar dataKey="revenue" fill="#E8D5BE" radius={[8, 8, 0, 0]} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F7F8F5' }} />
+                <Bar dataKey="revenue" fill="#52735B" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -204,10 +204,10 @@ const ReportsPage: React.FC = () => {
                 <Line
                   type="monotone"
                   dataKey="revenue"
-                  stroke="#8C6F56"
+                  stroke="#202923"
                   strokeWidth={2.5}
-                  dot={{ fill: '#8C6F56', r: 4, strokeWidth: 0 }}
-                  activeDot={{ r: 6, fill: '#8C6F56' }}
+                  dot={{ fill: '#202923', r: 4, strokeWidth: 0 }}
+                  activeDot={{ r: 6, fill: '#52735B' }}
                 />
               </LineChart>
             </ResponsiveContainer>

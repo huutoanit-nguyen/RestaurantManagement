@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Minus, X, ShoppingBag, Loader2, BookMarked, PlusCircle, Trash2, FileText, QrCode, CheckCircle2, CreditCard } from 'lucide-react';
+import { Users, Plus, Minus, X, ShoppingBag, Loader2, BookMarked, PlusCircle, Trash2, FileText, QrCode, CheckCircle2, CreditCard, MoveRight } from 'lucide-react';
 import { tableApi } from '../api/tableApi';
 import { menuApi } from '../api/menuApi';
 import type { RestaurantTable, TableStatus } from '../types/table';
@@ -67,6 +67,10 @@ const Dashboard: React.FC = () => {
   const [reserving, setReserving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showMoveTable, setShowMoveTable] = useState(false);
+  const [moveTargetId, setMoveTargetId] = useState<number | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [movingOrder, setMovingOrder] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ tableNumber: '', capacity: '', location: '' });
@@ -363,6 +367,54 @@ const Dashboard: React.FC = () => {
       alert('Failed to reserve table. Please try again.');
     } finally {
       setReserving(false);
+    }
+  };
+
+  const handleMoveOrder = async () => {
+    if (!selectedTable || moveTargetId === null) return;
+    const orderId = tableOrderIds[selectedTable.id];
+    if (!orderId) {
+      setMoveError('Could not find an active order for this table.');
+      return;
+    }
+
+    setMovingOrder(true);
+    setMoveError(null);
+    try {
+      const result = await orderFetch<{
+        order: { id: number; tableId: number };
+        sourceTable: RestaurantTable;
+        destinationTable: RestaurantTable;
+      }>(`/api/orders/${orderId}/table`, {
+        method: 'PATCH',
+        body: JSON.stringify({ tableId: moveTargetId }),
+      });
+
+      setTables(prev => prev.map(table => {
+        if (table.id === result.sourceTable.id) return result.sourceTable;
+        if (table.id === result.destinationTable.id) return result.destinationTable;
+        return table;
+      }));
+      setSelectedTable(result.destinationTable);
+      setTableOrders(prev => {
+        const orderItems = prev[selectedTable.id] ?? [];
+        const next = { ...prev };
+        delete next[selectedTable.id];
+        next[result.destinationTable.id] = orderItems;
+        return next;
+      });
+      setTableOrderIds(prev => {
+        const next = { ...prev };
+        delete next[selectedTable.id];
+        next[result.destinationTable.id] = result.order.id;
+        return next;
+      });
+      setShowMoveTable(false);
+      setMoveTargetId(null);
+    } catch (error) {
+      setMoveError(error instanceof Error ? error.message : 'Failed to move the order. Please try again.');
+    } finally {
+      setMovingOrder(false);
     }
   };
 
@@ -732,6 +784,14 @@ const Dashboard: React.FC = () => {
               {confirmedOrder.length > 0 && (
                 <div className="space-y-2">
                   <button
+                    onClick={() => { setMoveTargetId(null); setMoveError(null); setShowMoveTable(true); }}
+                    disabled={movingOrder}
+                    className="w-full border-2 border-amber-200 text-amber-700 py-3 rounded-2xl font-bold hover:bg-amber-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    <MoveRight size={16} />
+                    Change table (keep order)
+                  </button>
+                  <button
                     onClick={handleExportInvoice}
                     className="w-full border-2 border-[#52735B] text-[#52735B] py-3 rounded-2xl font-bold hover:bg-[#F7F8F5] hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                   >
@@ -873,6 +933,69 @@ const Dashboard: React.FC = () => {
             <p className="text-xs text-gray-300 mt-3 text-center">
               Only tap after the terminal shows an approved transaction.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Move an active order to an available table without changing its items */}
+      {showMoveTable && selectedTable && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => { if (!movingOrder) setShowMoveTable(false); }}
+          />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-bold text-gray-800">Change table</h3>
+              <button
+                onClick={() => setShowMoveTable(false)}
+                disabled={movingOrder}
+                className="p-2 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Move the order from Table {String(selectedTable.tableNumber).padStart(2, '0')}. All ordered items will be kept.
+            </p>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {tables.filter(table => table.status === 'AVAILABLE').map(table => (
+                <button
+                  key={table.id}
+                  onClick={() => { setMoveTargetId(table.id); setMoveError(null); }}
+                  className={`w-full px-4 py-3 rounded-xl border text-left transition ${
+                    moveTargetId === table.id
+                      ? 'border-[#52735B] bg-[#F0F6EF] text-[#202923]'
+                      : 'border-gray-200 hover:border-[#52735B]'
+                  }`}
+                >
+                  <span className="font-semibold">Table {String(table.tableNumber).padStart(2, '0')}</span>
+                  <span className="ml-2 text-sm text-gray-400">{table.capacity} seats</span>
+                  {table.location && <span className="block text-xs text-gray-400 mt-1">{table.location}</span>}
+                </button>
+              ))}
+              {tables.every(table => table.status !== 'AVAILABLE') && (
+                <p className="text-sm text-gray-400 text-center py-6">No available tables.</p>
+              )}
+            </div>
+            {moveError && <p className="mt-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-xl">{moveError}</p>}
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setShowMoveTable(false)}
+                disabled={movingOrder}
+                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMoveOrder}
+                disabled={movingOrder || moveTargetId === null}
+                className="flex-1 py-3 rounded-xl bg-[#202923] text-[#C7F4A4] font-bold hover:bg-[#52735B] disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {movingOrder && <Loader2 size={16} className="animate-spin" />}
+                {movingOrder ? 'Moving...' : 'Move order'}
+              </button>
+            </div>
           </div>
         </div>
       )}

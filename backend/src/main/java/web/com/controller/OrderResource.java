@@ -2,6 +2,7 @@ package web.com.controller;
 
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -31,6 +32,8 @@ public class OrderResource {
     public record OrderItemRequest(Long menuItemId, int quantity) {}
     public record CreateOrderRequest(Long tableId, List<OrderItemRequest> items) {}
     public record AddItemsRequest(List<OrderItemRequest> items) {}
+    public record MoveOrderRequest(Long tableId) {}
+    public record MoveOrderResponse(Order order, TableEntity sourceTable, TableEntity destinationTable) {}
 
     // GET /api/orders?tableId=1&status=PENDING
     @GET
@@ -149,6 +152,84 @@ public class OrderResource {
         return order;
     }
 
+    // PATCH /api/orders/{id}/table — chuyển order đang mở sang bàn khác
+    @PATCH
+    @Path("/{id}/table")
+    @Transactional
+    @RolesAllowed({ Roles.QUAN_LY, Roles.PHUC_VU })
+    public Response moveToTable(@PathParam("id") Long id, MoveOrderRequest req) {
+        Long rid = tenant.restaurantId();
+        if (req == null || req.tableId() == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity(new ErrorResponse("tableId is required"))
+                .build();
+        }
+
+        Order order = Order.find("id = ?1 and restaurantId = ?2", id, rid)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .firstResult();
+        if (order == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                .entity(new ErrorResponse("Không tìm thấy order id = " + id))
+                .build();
+        }
+        if (!"PENDING".equals(order.status)) {
+            return Response.status(Response.Status.CONFLICT)
+                .entity(new ErrorResponse("Chỉ có thể chuyển order chưa thanh toán"))
+                .build();
+        }
+        if (order.tableId.equals(req.tableId())) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity(new ErrorResponse("Bàn đích phải khác bàn hiện tại"))
+                .build();
+        }
+
+        TableEntity source = TableEntity.findByIdAndRestaurant(order.tableId, rid);
+        if (source == null) {
+            return Response.status(Response.Status.CONFLICT)
+                .entity(new ErrorResponse("Bàn hiện tại của order không tồn tại"))
+                .build();
+        }
+
+        // Lock both tables in a stable order so concurrent transfers cannot claim the same destination.
+        TableEntity destination;
+        if (source.id < req.tableId()) {
+            source = lockTable(source.id, rid);
+            destination = lockTable(req.tableId(), rid);
+        } else {
+            destination = lockTable(req.tableId(), rid);
+            source = lockTable(source.id, rid);
+        }
+        if (source == null) {
+            return Response.status(Response.Status.CONFLICT)
+                .entity(new ErrorResponse("Bàn hiện tại của order không tồn tại"))
+                .build();
+        }
+        if (destination == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                .entity(new ErrorResponse("Bàn đích không tồn tại"))
+                .build();
+        }
+        if (!"AVAILABLE".equals(destination.status)) {
+            return Response.status(Response.Status.CONFLICT)
+                .entity(new ErrorResponse("Bàn đích không còn trống"))
+                .build();
+        }
+
+        order.tableId = destination.id;
+        destination.status = "OCCUPIED";
+        long remainingOrders = Order.count(
+            "restaurantId = ?1 and tableId = ?2 and status = ?3 and id <> ?4",
+            rid, source.id, "PENDING", order.id
+        );
+        if (remainingOrders == 0) source.status = "AVAILABLE";
+
+        broadcaster.broadcast(rid, "ORDER_UPDATED", order);
+        broadcaster.broadcast(rid, "TABLE_UPDATED", source);
+        broadcaster.broadcast(rid, "TABLE_UPDATED", destination);
+        return Response.ok(new MoveOrderResponse(order, source, destination)).build();
+    }
+
     // PUT /api/orders/{id}/pay — thanh toán
     @PUT
     @Path("/{id}/pay")
@@ -197,6 +278,12 @@ public class OrderResource {
             );
         }
         return o;
+    }
+
+    private TableEntity lockTable(Long id, Long restaurantId) {
+        return TableEntity.find("id = ?1 and restaurantId = ?2", id, restaurantId)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .firstResult();
     }
 
     private WebApplicationException bad(String message) {

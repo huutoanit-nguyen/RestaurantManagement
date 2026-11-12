@@ -20,4 +20,8 @@ public class MenuItem extends PanacheEntity {
 
     @Min(value = 1000, message = "Giá phải lớn hơn 1.000đ")
     public long price;
+
+    /** Optional Cloudinary URL for the dish image. */
+    @Column(name = "image_url", length = 1024)
+    public String imageUrl;
 }

@@ -47,12 +47,13 @@ public class MenuItemResource {
         return findOrThrow(id);
     }
 
+    // Override restaurantId from token; ignore client-supplied value
     @POST
     @Transactional
     @RolesAllowed({ Roles.CHU_CUA_HANG, Roles.QUAN_LY })
     public Response create(@Valid MenuItem item) {
         item.id = null;
-        item.restaurantId = tenant.restaurantId(); // ghi đè, bỏ qua giá trị client gửi
+        item.restaurantId = tenant.restaurantId(); // override with authenticated restaurant
         item.persist();
         return Response.status(Response.Status.CREATED).entity(item).build();
     }
@@ -66,6 +67,7 @@ public class MenuItemResource {
         entity.name     = body.name;
         entity.category = body.category;
         entity.price    = body.price;
+        entity.imageUrl = body.imageUrl;
         return entity;
     }
 

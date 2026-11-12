@@ -38,10 +38,15 @@ async function orderFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+const VIETQR_BANK_ID = import.meta.env.VITE_VIETQR_BANK_ID || 'MB';
+const VIETQR_ACCOUNT_NO = import.meta.env.VITE_VIETQR_ACCOUNT_NO || '0000351212767';
+const VIETQR_ACCOUNT_NAME = import.meta.env.VITE_VIETQR_ACCOUNT_NAME || 'ResMana';
+
 // Builds a VietQR image URL using the public VietQR API (no API key required)
-function buildVietQRUrl(bankId: string, accountNo: string, amount: number, description: string): string {
+function buildVietQRUrl(bankId: string, accountNo: string, amount: number, description: string, accountName: string = VIETQR_ACCOUNT_NAME): string {
   const encoded = encodeURIComponent(description);
-  return `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${amount}&addInfo=${encoded}&accountName=ResMana`;
+  const encodedName = encodeURIComponent(accountName);
+  return `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${amount}&addInfo=${encoded}&accountName=${encodedName}`;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -86,9 +91,10 @@ const Dashboard: React.FC = () => {
   const [showCard, setShowCard] = useState(false);
   const [cardConfirming, setCardConfirming] = useState(false);
 
-  // Bank details — update these to match the restaurant's real account
-  const BANK_ID = 'MB';
-  const ACCOUNT_NO = '0000351212767';
+  // Bank details loaded from environment variables
+  const BANK_ID = VIETQR_BANK_ID;
+  const ACCOUNT_NO = VIETQR_ACCOUNT_NO;
+  const ACCOUNT_NAME = VIETQR_ACCOUNT_NAME;
 
   // Fetches all tables from the API and updates local state
   const fetchTables = async () => {
@@ -850,7 +856,8 @@ const Dashboard: React.FC = () => {
                   BANK_ID,
                   ACCOUNT_NO,
                   totalPrice,
-                  `Table ${String(selectedTable.tableNumber).padStart(2, '0')} - ResMana`
+                  `Table ${String(selectedTable.tableNumber).padStart(2, '0')} - ${ACCOUNT_NAME}`,
+                  ACCOUNT_NAME
                 )}
                 alt="VietQR payment code"
                 className="w-full h-full object-contain"
@@ -861,7 +868,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             <p className="text-xs text-gray-400 text-center mb-1">
-              Bank: <strong className="text-gray-700">{BANK_ID}</strong> · Account: <strong className="text-gray-700">{ACCOUNT_NO}</strong>
+              Bank: <strong className="text-gray-700">{BANK_ID}</strong> · Account: <strong className="text-gray-700">{ACCOUNT_NO}</strong> · Name: <strong className="text-gray-700">{ACCOUNT_NAME}</strong>
             </p>
             <p className="text-xs text-gray-300 text-center mb-6">
               The QR includes the transfer amount and table reference automatically.

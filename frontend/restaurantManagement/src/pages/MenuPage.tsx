@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Pencil, Trash2, Plus, X, Loader2, Search } from 'lucide-react';
+import { Pencil, Trash2, Plus, X, Loader2, Search, Image as ImageIcon } from 'lucide-react';
 import { session } from '../api/auth';
+
+// ─── Cloudinary config from environment variables ────────────────────────────
+const CLOUDINARY_CLOUD_NAME   = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string;
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string;
 
 type Category = 'Món chính' | 'Khai vị' | 'Đồ uống' | 'Tráng miệng';
 
@@ -9,6 +13,7 @@ interface Dish {
   name: string;
   category: Category;
   price: number;
+  imageUrl?: string;
 }
 
 interface ApiError {
@@ -16,10 +21,24 @@ interface ApiError {
 }
 
 const CATEGORIES: Category[] = ['Món chính', 'Khai vị', 'Đồ uống', 'Tráng miệng'];
-const EMPTY_FORM = { name: '', category: 'Món chính' as Category, price: '' };
+const EMPTY_FORM = { name: '', category: 'Món chính' as Category, price: '', imageUrl: '' };
 const BASE_URL = '/api/menu-items';
 
-// ─── API helpers ──────────────────────────────────────────────────────────────
+// ─── Uploads an image file to Cloudinary and returns the secure URL ───────────
+async function uploadToCloudinary(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  );
+  if (!res.ok) throw new Error('Image upload failed');
+  const data = await res.json();
+  return data.secure_url as string;
+}
+
+// ─── Generic authenticated fetch helper ──────────────────────────────────────
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = session.token;
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -32,7 +51,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (res.status === 401) {
     session.clear();
     window.location.href = '/login';
-    throw new Error('Hết phiên');
+    throw new Error('Session expired');
   }
   if (!res.ok) {
     const err: ApiError = await res.json().catch(() => ({ message: res.statusText }));
@@ -41,6 +60,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+// ─── Typed API methods for menu items ────────────────────────────────────────
 const api = {
   getAll:  (category?: string) =>
     apiFetch<Dish[]>(category ? `?category=${encodeURIComponent(category)}` : ''),
@@ -54,19 +74,24 @@ const api = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const MenuPage: React.FC = () => {
-  const [dishes, setDishes]               = useState<Dish[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [fetchError, setFetchError]       = useState<string | null>(null);
-  const [search, setSearch]               = useState('');
-  const [showModal, setShowModal]         = useState(false);
-  const [editTarget, setEditTarget]       = useState<Dish | null>(null);
-  const [form, setForm]                   = useState(EMPTY_FORM);
-  const [formError, setFormError]         = useState<string | null>(null);
-  const [saving, setSaving]               = useState(false);
-  const [deleteTarget, setDeleteTarget]   = useState<Dish | null>(null);
-  const [deleting, setDeleting]           = useState(false);
+  const [dishes, setDishes]             = useState<Dish[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [fetchError, setFetchError]     = useState<string | null>(null);
+  const [search, setSearch]             = useState('');
+  const [showModal, setShowModal]       = useState(false);
+  const [editTarget, setEditTarget]     = useState<Dish | null>(null);
+  const [form, setForm]                 = useState(EMPTY_FORM);
+  const [formError, setFormError]       = useState<string | null>(null);
+  const [saving, setSaving]             = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Dish | null>(null);
+  const [deleting, setDeleting]         = useState(false);
 
-  // ── Fetch on mount ──
+  // Image upload state
+  const [imageFile, setImageFile]       = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploading, setUploading]       = useState(false);
+
+  // ── Load dishes on mount ──
   const loadDishes = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
@@ -74,7 +99,7 @@ const MenuPage: React.FC = () => {
       const data = await api.getAll();
       setDishes(data);
     } catch (e: any) {
-      setFetchError(e.message ?? 'Không tải được dữ liệu');
+      setFetchError(e.message ?? 'Failed to load menu');
     } finally {
       setLoading(false);
     }
@@ -92,33 +117,55 @@ const MenuPage: React.FC = () => {
     return acc;
   }, {} as Record<Category, Dish[]>);
 
-  // ── Modal helpers ──
+  // ── Handles file input change and generates a local preview ──
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  // ── Opens modal in Add mode ──
   const openAdd = () => {
     setEditTarget(null);
     setForm(EMPTY_FORM);
     setFormError(null);
+    setImageFile(null);
+    setImagePreview('');
     setShowModal(true);
   };
 
+  // ── Opens modal in Edit mode, pre-filling current dish data ──
   const openEdit = (dish: Dish) => {
     setEditTarget(dish);
-    setForm({ name: dish.name, category: dish.category, price: String(dish.price) });
+    setForm({ name: dish.name, category: dish.category, price: String(dish.price), imageUrl: dish.imageUrl || '' });
     setFormError(null);
+    setImageFile(null);
+    setImagePreview(dish.imageUrl || '');
     setShowModal(true);
   };
 
   const closeModal = () => setShowModal(false);
 
-  // ── Save (create / update) ──
+  // ── Uploads image if selected, then saves the dish via API ──
   const handleSave = async () => {
-    if (!form.name.trim())  { setFormError('Vui lòng nhập tên món'); return; }
+    if (!form.name.trim()) { setFormError('Please enter the dish name'); return; }
     const price = Number(form.price);
-    if (!form.price || isNaN(price) || price <= 0) { setFormError('Giá không hợp lệ'); return; }
+    if (!form.price || isNaN(price) || price <= 0) { setFormError('Invalid price'); return; }
 
     setSaving(true);
     setFormError(null);
     try {
-      const payload = { name: form.name.trim(), category: form.category, price };
+      let finalImageUrl = form.imageUrl;
+      if (imageFile) {
+        setUploading(true);
+        try {
+          finalImageUrl = await uploadToCloudinary(imageFile);
+        } finally {
+          setUploading(false);
+        }
+      }
+      const payload = { name: form.name.trim(), category: form.category, price, imageUrl: finalImageUrl };
       if (editTarget) {
         const updated = await api.update(editTarget.id, payload);
         setDishes(prev => prev.map(d => d.id === updated.id ? updated : d));
@@ -128,13 +175,13 @@ const MenuPage: React.FC = () => {
       }
       setShowModal(false);
     } catch (e: any) {
-      setFormError(e.message ?? 'Lưu thất bại, thử lại');
+      setFormError(e.message ?? 'Save failed, please try again');
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Delete ──
+  // ── Deletes a dish after confirmation ──
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -143,8 +190,7 @@ const MenuPage: React.FC = () => {
       setDishes(prev => prev.filter(d => d.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (e: any) {
-      // bubble lên toast nếu có, tạm thời alert
-      alert(e.message ?? 'Xoá thất bại');
+      alert(e.message ?? 'Delete failed');
     } finally {
       setDeleting(false);
     }
@@ -208,7 +254,9 @@ const MenuPage: React.FC = () => {
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-                  <div className="grid grid-cols-[1fr_150px_120px_100px] px-5 py-3 border-b border-gray-50 bg-gray-50/30">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[48px_1fr_150px_120px_100px] px-5 py-3 border-b border-gray-50 bg-gray-50/30">
+                    <span />
                     <span className="text-[10px] font-bold text-gray-400 uppercase">Tên món</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Danh mục</span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase">Giá tiền</span>
@@ -223,8 +271,16 @@ const MenuPage: React.FC = () => {
                     rows.map((dish, idx) => (
                       <div
                         key={dish.id}
-                        className={`grid grid-cols-[1fr_150px_120px_100px] px-5 py-3.5 items-center hover:bg-gray-50/50 transition-colors ${idx < rows.length - 1 ? 'border-b border-gray-50' : ''}`}
+                        className={`grid grid-cols-[48px_1fr_150px_120px_100px] px-5 py-3.5 items-center hover:bg-gray-50/50 transition-colors ${idx < rows.length - 1 ? 'border-b border-gray-50' : ''}`}
                       >
+                        {/* Dish thumbnail */}
+                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                          {dish.imageUrl ? (
+                            <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon size={16} className="text-gray-300" />
+                          )}
+                        </div>
                         <span className="text-sm font-medium text-gray-700">{dish.name}</span>
                         <span className="text-xs text-gray-500 text-center bg-gray-100 py-1 rounded-full">{dish.category}</span>
                         <span className="text-sm text-gray-600 font-semibold">{dish.price.toLocaleString()}đ</span>
@@ -242,7 +298,7 @@ const MenuPage: React.FC = () => {
         </div>
       )}
 
-      {/* Edit / Add Modal */}
+      {/* Add / Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeModal} />
@@ -252,6 +308,28 @@ const MenuPage: React.FC = () => {
               <X size={20} className="text-gray-400 cursor-pointer hover:text-gray-600" onClick={closeModal} />
             </div>
             <div className="space-y-4">
+
+              {/* Image upload area */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center">
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon size={28} className="text-gray-300" />
+                  )}
+                </div>
+                <label className="cursor-pointer text-xs font-semibold text-[#52735B] hover:underline">
+                  {uploading ? 'Uploading...' : imagePreview ? 'Change image' : 'Upload image'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageChange}
+                    disabled={uploading}
+                  />
+                </label>
+              </div>
+
               <input
                 type="text" placeholder="Tên món" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -272,10 +350,10 @@ const MenuPage: React.FC = () => {
               {formError && <p className="text-red-500 text-xs px-1">{formError}</p>}
             </div>
             <button
-              onClick={handleSave} disabled={saving}
-              className="w-full mt-6 py-3 bg-[#202923] text-[#C7F4A4] rounded-xl font-bold text-sm hover:bg-[#52735B] hover:text-white transition-all flex justify-center items-center gap-2 cursor-pointer"
+              onClick={handleSave} disabled={saving || uploading}
+              className="w-full mt-6 py-3 bg-[#202923] text-[#C7F4A4] rounded-xl font-bold text-sm hover:bg-[#52735B] hover:text-white transition-all flex justify-center items-center gap-2 cursor-pointer disabled:opacity-60"
             >
-              {saving && <Loader2 size={16} className="animate-spin" />}
+              {(saving || uploading) && <Loader2 size={16} className="animate-spin" />}
               {editTarget ? 'Cập nhật' : 'Thêm vào thực đơn'}
             </button>
           </div>

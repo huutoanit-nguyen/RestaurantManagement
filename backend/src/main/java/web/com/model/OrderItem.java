@@ -24,4 +24,7 @@ public class OrderItem extends PanacheEntity {
 
     @Column(nullable = false)
     public int quantity;
+
+    @Column(length = 500)
+    public String note;
 }

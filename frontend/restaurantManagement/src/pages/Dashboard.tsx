@@ -11,6 +11,7 @@ import jsPDF from 'jspdf';
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface CartItem extends MenuItem {
   quantity: number;
+  note?: string;
 }
 
 // Maps each table status to its card/badge display styles and English label
@@ -125,6 +126,7 @@ const Dashboard: React.FC = () => {
           name: i.name,
           price: i.price,
           quantity: i.quantity,
+          note: i.note || undefined,
           category: '',
         }));
       }
@@ -188,16 +190,19 @@ const Dashboard: React.FC = () => {
   // Adds a dish to the pending (not yet confirmed) cart
   const addToPending = (dish: MenuItem) => {
     setPendingCart(prev => {
-      const existing = prev.find(i => i.id === dish.id);
-      if (existing) return prev.map(i => i.id === dish.id ? { ...i, quantity: i.quantity + 1 } : i);
+      const existingIndex = prev.findIndex(i => i.id === dish.id && !i.note);
+      if (existingIndex >= 0) {
+        return prev.map((item, index) => index === existingIndex ? { ...item, quantity: item.quantity + 1 } : item);
+      }
       return [...prev, { ...dish, quantity: 1 }];
     });
   };
 
-  // Decrements a pending cart item; removes it when quantity reaches zero
-  const removeFromPending = (id: number) => {
+  const changePendingQuantity = (index: number, amount: number) => {
     setPendingCart(prev =>
-      prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i)
+      prev.map((item, itemIndex) => itemIndex === index
+        ? { ...item, quantity: item.quantity + amount }
+        : item)
         .filter(i => i.quantity > 0)
     );
   };
@@ -207,7 +212,7 @@ const Dashboard: React.FC = () => {
   // Merges confirmed order items with pending cart for the total price display
   const allItems = [...confirmedOrder];
   for (const p of pendingCart) {
-    const idx = allItems.findIndex(i => i.id === p.id);
+    const idx = allItems.findIndex(i => i.id === p.id && (i.note || '') === (p.note || ''));
     if (idx >= 0) allItems[idx] = { ...allItems[idx], quantity: allItems[idx].quantity + p.quantity };
     else allItems.push(p);
   }
@@ -231,7 +236,7 @@ const Dashboard: React.FC = () => {
         await orderFetch(`/api/orders/${existingOrderId}/items`, {
           method: 'POST',
           body: JSON.stringify({
-            items: pendingCart.map(i => ({ menuItemId: i.id, quantity: i.quantity })),
+            items: pendingCart.map(i => ({ menuItemId: i.id, quantity: i.quantity, note: i.note?.trim() || null })),
           }),
         });
       } else {
@@ -240,7 +245,7 @@ const Dashboard: React.FC = () => {
           method: 'POST',
           body: JSON.stringify({
             tableId: selectedTable.id,
-            items: pendingCart.map(i => ({ menuItemId: i.id, quantity: i.quantity })),
+            items: pendingCart.map(i => ({ menuItemId: i.id, quantity: i.quantity, note: i.note?.trim() || null })),
           }),
         });
         setTableOrderIds(prev => ({ ...prev, [selectedTable.id]: newOrder.id }));
@@ -250,7 +255,7 @@ const Dashboard: React.FC = () => {
         const current = prev[selectedTable.id] ?? [];
         const updated = [...current];
         for (const p of pendingCart) {
-          const idx = updated.findIndex(i => i.id === p.id);
+          const idx = updated.findIndex(i => i.id === p.id && (i.note || '') === (p.note || ''));
           if (idx >= 0) updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + p.quantity };
           else updated.push(p);
         }
@@ -668,9 +673,10 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     {confirmedOrder.map(item => (
-                      <div key={item.id} className="flex justify-between items-center bg-[#F7F8F5] px-4 py-3 rounded-2xl border border-[#202923]/10">
+                      <div key={`${item.id}-${item.note || ''}`} className="flex justify-between items-center bg-[#F7F8F5] px-4 py-3 rounded-2xl border border-[#202923]/10">
                         <div>
                           <p className="font-semibold text-gray-800 text-sm">{item.name}</p>
+                          {item.note && <p className="text-gray-500 text-xs mt-1">Note: {item.note}</p>}
                           <p className="text-[#52735B] text-xs font-medium">{(item.price * item.quantity).toLocaleString()}đ</p>
                         </div>
                         <span className="text-sm font-bold text-gray-500">x{item.quantity}</span>
@@ -693,17 +699,29 @@ const Dashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {pendingCart.map(item => (
-                      <div key={item.id} className="flex justify-between items-center bg-gray-50 px-4 py-3 rounded-2xl border border-gray-100">
-                        <div>
-                          <p className="font-medium text-gray-800 text-sm">{item.name}</p>
-                          <p className="text-gray-400 text-xs">{(item.price * item.quantity).toLocaleString()}đ</p>
+                    {pendingCart.map((item, index) => (
+                      <div key={`${item.id}-${index}`} className="bg-gray-50 px-4 py-3 rounded-2xl border border-gray-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium text-gray-800 text-sm">{item.name}</p>
+                            <p className="text-gray-400 text-xs">{(item.price * item.quantity).toLocaleString()}đ</p>
+                          </div>
+                          <div className="flex items-center space-x-3 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+                            <button onClick={() => changePendingQuantity(index, -1)} className="p-1 hover:text-red-500"><Minus size={14} /></button>
+                            <span className="text-sm w-4 text-center">{item.quantity}</span>
+                            <button onClick={() => changePendingQuantity(index, 1)} className="p-1 hover:text-green-500"><Plus size={14} /></button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-3 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
-                          <button onClick={() => removeFromPending(item.id)} className="p-1 hover:text-red-500"><Minus size={14} /></button>
-                          <span className="text-sm w-4 text-center">{item.quantity}</span>
-                          <button onClick={() => addToPending(item)} className="p-1 hover:text-green-500"><Plus size={14} /></button>
-                        </div>
+                        <textarea
+                          value={item.note || ''}
+                          onChange={event => setPendingCart(prev => prev.map((cartItem, cartIndex) =>
+                            cartIndex === index ? { ...cartItem, note: event.target.value } : cartItem
+                          ))}
+                          maxLength={500}
+                          placeholder="Special instructions (e.g. less spicy, no cilantro)"
+                          aria-label={`Special instructions for ${item.name}`}
+                          className="mt-3 w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 placeholder:text-gray-400 focus:border-[#52735B] focus:outline-none"
+                        />
                       </div>
                     ))}
                   </div>

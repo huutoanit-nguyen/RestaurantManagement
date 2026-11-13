@@ -19,6 +19,7 @@ import web.com.websocket.WebSocketBroadcaster;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Path("/api/orders")
 @Produces(MediaType.APPLICATION_JSON)
@@ -29,7 +30,7 @@ public class OrderResource {
     @Inject WebSocketBroadcaster broadcaster;
 
     // ── Request records ───────────────────────────────────────────────────────
-    public record OrderItemRequest(Long menuItemId, int quantity) {}
+    public record OrderItemRequest(Long menuItemId, int quantity, String note) {}
     public record CreateOrderRequest(Long tableId, List<OrderItemRequest> items) {}
     public record AddItemsRequest(List<OrderItemRequest> items) {}
     public record MoveOrderRequest(Long tableId) {}
@@ -80,6 +81,7 @@ public class OrderResource {
         if (req.items() != null) {
             for (OrderItemRequest i : req.items()) {
                 if (i.quantity() <= 0) throw bad("Số lượng phải lớn hơn 0");
+                String note = normalizeNote(i.note());
 
                 // 3. Lấy tên và GIÁ từ DB, không tin client
                 MenuItem m = MenuItem.find("id = ?1 and restaurantId = ?2", i.menuItemId(), rid).firstResult();
@@ -91,6 +93,7 @@ public class OrderResource {
                 item.name = m.name;
                 item.price = m.price;
                 item.quantity = i.quantity();
+                item.note = note;
                 order.items.add(item);
             }
         }
@@ -124,13 +127,15 @@ public class OrderResource {
         if (req.items() != null) {
             for (OrderItemRequest i : req.items()) {
                 if (i.quantity() <= 0) throw bad("Số lượng phải lớn hơn 0");
+                String note = normalizeNote(i.note());
 
                 MenuItem m = MenuItem.find("id = ?1 and restaurantId = ?2", i.menuItemId(), rid).firstResult();
                 if (m == null) throw bad("Món không tồn tại: " + i.menuItemId());
 
-                // Nếu món đã có thì tăng quantity
+                // Chỉ gộp món có cùng tuỳ chỉnh.
                 order.items.stream()
-                    .filter(existing -> existing.menuItemId.equals(i.menuItemId()))
+                    .filter(existing -> existing.menuItemId.equals(i.menuItemId())
+                        && Objects.equals(existing.note, note))
                     .findFirst()
                     .ifPresentOrElse(
                         existing -> existing.quantity += i.quantity(),
@@ -141,6 +146,7 @@ public class OrderResource {
                             item.name       = m.name;
                             item.price      = m.price;
                             item.quantity   = i.quantity();
+                            item.note       = note;
                             order.items.add(item);
                         }
                     );
@@ -290,5 +296,12 @@ public class OrderResource {
         return new WebApplicationException(
             Response.status(Response.Status.BAD_REQUEST).entity(new ErrorResponse(message)).build()
         );
+    }
+
+    private String normalizeNote(String note) {
+        if (note == null) return null;
+        String normalized = note.trim();
+        if (normalized.length() > 500) throw bad("Ghi chú không được vượt quá 500 ký tự");
+        return normalized.isEmpty() ? null : normalized;
     }
 }
